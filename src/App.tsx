@@ -258,6 +258,52 @@ export default function App() {
     }
   }
 
+  async function handleExportCorpus(format: 'jsonl' | 'json') {
+    try {
+      showToast(`Preparing ${format.toUpperCase()} export...`);
+      const res = await fetch(`/api/corpus/export?format=${format}`);
+      const text = await res.text();
+      if (text.trim().toLowerCase().startsWith('<!doctype html>')) {
+        setErrorMessage('Export response was intercepted by HTML proxy. Please try Copy JSONL to Clipboard.');
+        showToast('Export blocked by proxy — use Copy JSONL to Clipboard');
+        return;
+      }
+      const blob = new Blob([text], { type: 'application/json' });
+      const objectUrl = URL.createObjectURL(blob);
+      const tempLink = document.createElement('a');
+      tempLink.href = objectUrl;
+      tempLink.download =
+        format === 'jsonl'
+          ? 'signalpost_norway_1050_profiles.jsonl'
+          : 'signalpost_norway_1050_profiles.json';
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
+      URL.revokeObjectURL(objectUrl);
+      showToast(`Downloaded signalpost_norway_1050_profiles.${format}`);
+    } catch (err: any) {
+      showToast(err?.message || 'Export failed');
+    }
+  }
+
+  async function handleCopyJsonlToClipboard() {
+    try {
+      showToast('Fetching JSONL dataset for clipboard...');
+      const res = await fetch('/api/corpus/export?format=jsonl');
+      const text = await res.text();
+      if (text.trim().toLowerCase().startsWith('<!doctype html>')) {
+        showToast('Error: Received HTML instead of JSONL');
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      setCopiedKey('corpus-jsonl');
+      showToast('Copied all 1,050+ JSONL profiles to clipboard!');
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      showToast('Failed to copy JSONL to clipboard');
+    }
+  }
+
   const filteredFacts = useMemo(() => {
     if (!activeProfile) return [];
     if (factCategoryFilter === 'ALL') return activeProfile.facts;
@@ -390,14 +436,14 @@ npm run dev
 
         {/* Zone 3: 1 primary action */}
         <div className="flex items-center shrink-0">
-          <a
-            href="/api/corpus/export?format=jsonl"
-            download
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0"
+          <button
+            type="button"
+            onClick={() => void handleExportCorpus('jsonl')}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             Export 1,000+ JSONL
-          </a>
+          </button>
         </div>
       </header>
 
@@ -997,23 +1043,36 @@ npm run dev
                     {isSyncingCorpus ? 'Syncing Brreg API...' : 'Sync Live Batch from data.brreg.no'}
                   </button>
 
-                  <a
-                    href="/api/corpus/export?format=jsonl"
-                    download
-                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0"
+                  <button
+                    type="button"
+                    onClick={() => void handleExportCorpus('jsonl')}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Download {corpusTotal.toLocaleString('en-US')} Profiles (.jsonl)
-                  </a>
+                  </button>
 
-                  <a
-                    href="/api/corpus/export?format=json"
-                    download
-                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+                  <button
+                    type="button"
+                    onClick={() => void handleExportCorpus('json')}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Download JSON
-                  </a>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyJsonlToClipboard()}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-800 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    {copiedKey === 'corpus-jsonl' ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-700" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    Copy JSONL to Clipboard
+                  </button>
                 </div>
               </div>
 
@@ -1388,14 +1447,26 @@ npm run dev
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 shrink-0">
-                  <a
-                    href="/api/corpus/export?format=jsonl"
-                    download
-                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0"
+                  <button
+                    type="button"
+                    onClick={() => void handleExportCorpus('jsonl')}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     1. Download 1,050+ Profiles (.jsonl)
-                  </a>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyJsonlToClipboard()}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    {copiedKey === 'corpus-jsonl' ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-700" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    Copy JSONL to Clipboard
+                  </button>
                   <button
                     type="button"
                     onClick={() => copyText('submission-md', submissionReadmeContent)}
@@ -1539,13 +1610,13 @@ npm run dev
               Enhetsregisteret API Docs
             </a>
             <span aria-hidden="true">·</span>
-            <a
-              href="/api/corpus/export?format=jsonl"
-              download
-              className="hover:text-slate-900 transition-colors font-medium"
+            <button
+              type="button"
+              onClick={() => void handleExportCorpus('jsonl')}
+              className="hover:text-slate-900 transition-colors font-medium cursor-pointer"
             >
               Export 1,050+ Profiles (.jsonl)
-            </a>
+            </button>
           </div>
         </div>
       </footer>
