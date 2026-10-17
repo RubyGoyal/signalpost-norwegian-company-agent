@@ -94,7 +94,7 @@ export default function App() {
   const [isRunningBenchmark, setIsRunningBenchmark] = useState<boolean>(false);
   const [manifest, setManifest] = useState<SubmissionManifest | null>(null);
   const [customRepoUrl, setCustomRepoUrl] = useState<string>(
-    'https://github.com/signalpost-agent/norway-company-intelligence'
+    'https://github.com/RubyGoyal/signalpost-norwegian-company-agent'
   );
   const [customCommitHash, setCustomCommitHash] = useState<string>(
     '8f4e2a9c1d7b3056e914a82c7d0b5f3e19a4c621'
@@ -293,7 +293,7 @@ npm run dev
    - Brønnøysundregistrene Rolleutskrift API (\`https://data.brreg.no/enhetsregisteret/api/enheter/{orgnr}/roller\`)
    - Brønnøysundregistrene Regnskapsregisteret API (\`https://data.brreg.no/regnskapsregisteret/regnskap/{orgnr}\`)
 2. **Grounded Public Web Discovery**:
-   - Model: \`gemini-3.8-flash\` via server-side \`@google/genai\` SDK with \`googleSearch\` tool enabled.
+   - Model: \`gemini-2.5-flash\` via server-side \`@google/genai\` SDK with \`googleSearch\` tool enabled.
 3. **Qualification Guardrails**:
    - **Norwegian Modulo-11 Validator**: Rejects malformed organization numbers before network execution.
    - **Strict Entity-Match Guardrail**: Cross-checks 9-digit \`organisasjonsnummer\`, canonical legal name, and municipality to prevent subsidiary/parent conflation.
@@ -414,7 +414,7 @@ npm run dev
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-900">Norwegian Public Registry + Grounded Web Agent</span>
             <span aria-hidden="true">·</span>
-            <span>Brønnøysundregistrene Open API + Gemini 3.8 Flash</span>
+            <span>Brønnøysundregistrene Open API + Gemini 2.5 Flash</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono tabular-nums text-slate-800">
               Corpus: {telemetry.profilesInCorpus.toLocaleString('en-US')} Verified Profiles (Target ≥ 1,000)
@@ -1469,7 +1469,7 @@ npm run dev
                     <div className="flex justify-between py-1 border-b border-slate-200">
                       <dt className="text-slate-600">Primary Model & SDK</dt>
                       <dd className="font-mono font-semibold text-slate-900">
-                        {manifest?.modelDetails.primaryModel || 'gemini-3.8-flash (@google/genai)'}
+                        {manifest?.modelDetails.primaryModel || 'gemini-2.5-flash (@google/genai ^2.4.0)'}
                       </dd>
                     </div>
                     <div className="flex justify-between py-1 border-b border-slate-200">
