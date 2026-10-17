@@ -2,7 +2,7 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { validateNorwegianOrgNr } from '../src/types/signalpost.ts';
+import { validateOrgnr } from './orgnr.ts';
 import type { BrregClient, FetchResult } from './brreg.ts';
 import {
   ClaimBuilder,
@@ -268,7 +268,7 @@ function buildSummary(
 export async function researchCompany(rawOrgnr: string, inputIndex: number, ctx: RunContext): Promise<Envelope> {
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
-  const check = validateNorwegianOrgNr(rawOrgnr);
+  const check = validateOrgnr(rawOrgnr);
   if (!check.valid) {
     return failedEnvelope(check.normalized || rawOrgnr, inputIndex, ctx.runId, startedAt, 'invalid_organisation_number', check.reason || 'invalid organisation number');
   }

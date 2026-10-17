@@ -1,8 +1,6 @@
 {
   "name": "Signalpost — Norwegian Company Intelligence Agent",
-  "description": "Autonomous research agent and batch verification workbench that queries Norwegian Brønnøysundregistrene APIs and Gemini Search Grounding to build evidence-backed company profiles.",
+  "description": "Signalpost agent: reads official Norwegian registers (Brønnøysundregistrene) for an organisation number and publishes facts with source links, retrieval times and reporting periods. No AI model, no API keys.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }

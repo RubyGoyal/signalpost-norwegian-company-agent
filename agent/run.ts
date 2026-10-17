@@ -1,6 +1,6 @@
 // Signalpost batch runner.
 //
-//   npm run signalpost -- <input-file> [out-dir] [--run-id ID] [--state-dir DIR]
+//   npx tsx agent/run.ts <input-file | orgnr[,orgnr...]> [out-dir] [--run-id ID] [--state-dir DIR]
 //                         [--concurrency N] [--max-requests N] [--deadline-seconds N]
 //
 // Reads organisation numbers from <input-file> (.txt / .csv / .jsonl / .json, optionally .gz)
@@ -113,7 +113,11 @@ async function main() {
   const deadlineSec = Number(flags['deadline-seconds'] || process.env.SIGNALPOST_DEADLINE_SECONDS || 0);
 
   await fs.mkdir(outDir, { recursive: true });
-  const { orgnrs, skipped, duplicates } = await readInput(inputFile);
+  // Convenience: org numbers can be passed directly instead of a file, e.g. `923609016,984851006`.
+  const inlineNumbers = /^\d{9}(,\d{9})*$/.test(inputFile) && !(await fs.stat(inputFile).catch(() => null));
+  const { orgnrs, skipped, duplicates } = inlineNumbers
+    ? { orgnrs: [...new Set(inputFile.split(','))], skipped: 0, duplicates: 0 }
+    : await readInput(inputFile);
   process.stderr.write(`signalpost: ${orgnrs.length} organisation numbers from ${inputFile} (run ${runId})\n`);
 
   const client = new BrregClient({ concurrency, maxRequests, timeoutMs: 20_000, maxRetries: 3 });
