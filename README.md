@@ -92,6 +92,13 @@ Job postings and public activity are marked `not_checked_in_this_version`.
 npm run test:agent
 ```
 
+To smoke-test against the live registry on a random sample of real companies:
+
+```bash
+npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
+npx tsx agent/run.ts examples/smoke-100.txt out
+```
+
 This is an offline self-test (33 checks) against simulated registry responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
@@ -119,5 +126,6 @@ agent/extract.ts   registry response → claims and evidence
 agent/brreg.ts     HTTP client: concurrency, retries, budget, snapshots
 agent/types.ts     envelope schema
 agent/test/        offline self-test and registry fixtures (fictitious companies)
+scripts/           sample-batch.ts: random sample of real organisation numbers for smoke tests
 server.ts, src/    web app
 ```

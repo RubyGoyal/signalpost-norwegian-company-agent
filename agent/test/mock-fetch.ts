@@ -10,9 +10,10 @@ const C = '910000217'; // registry keeps failing (503)
 const D = '910000322'; // unknown number (404)
 const E = '910000357'; // deleted (410)
 
-const mutate = process.env.MOCK_MUTATE === '1';
-const failRoles = process.env.MOCK_FAIL_ROLES === '1';
-const hang = process.env.MOCK_HANG;
+const env: Record<string, string | undefined> = (globalThis as any).process?.env ?? {};
+const mutate = env.MOCK_MUTATE === '1';
+const failRoles = env.MOCK_FAIL_ROLES === '1';
+const hang = env.MOCK_HANG;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
