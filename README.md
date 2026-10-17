@@ -92,6 +92,8 @@ Job postings and public activity are marked `not_checked_in_this_version`.
 npm run test:agent
 ```
 
+**Live smoke test (17 October 2026):** 100 randomly sampled real companies, all 100 envelopes `available`, 0 source errors, 0 integrity issues, 5,292 claims, 400 requests, 19 s, $0. An immediate re-run on the same companies detected 0 changes. Details are in [`examples/smoke-100-report.json`](examples/smoke-100-report.json), with the sample in `examples/smoke-100.txt`.
+
 To smoke-test against the live registry on a random sample of real companies:
 
 ```bash
