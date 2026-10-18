@@ -858,7 +858,7 @@ function AboutView() {
               {about?.commit?.dirty ? ' (with uncommitted changes)' : ''}
             </dd>
             <dt className="text-slate-500">AI models</dt>
-            <dd>None — registry data only</dd>
+            <dd>None. Only public registry and NAV job data.</dd>
             <dt className="text-slate-500">Third-party cost</dt>
             <dd>$0 per run</dd>
           </dl>

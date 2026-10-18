@@ -8,24 +8,12 @@
 // plus <out-dir>/run-report.json. Stdout carries only the final one-line JSON summary.
 
 import { createWriteStream, promises as fs } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { BrregClient } from './brreg.ts';
+import { readInput } from './input.ts';
 import { NavJobIndex, type JobIndexInfo } from './jobs.ts';
 import { failedEnvelope, researchCompany, type RunContext } from './profile.ts';
 import { FIELD_FAMILIES, type Envelope } from './types.ts';
-
-const ORG_KEYS = [
-  'organisation_number',
-  'organisationNumber',
-  'organization_number',
-  'organizationNumber',
-  'organisasjonsnummer',
-  'orgnr',
-  'orgNr',
-  'org_number',
-  'orgnummer',
-];
 
 function parseArgs(argv: string[]) {
   const pos: string[] = [];
@@ -38,58 +26,6 @@ function parseArgs(argv: string[]) {
     } else pos.push(a);
   }
   return { pos, flags };
-}
-
-function pickOrgnr(v: unknown): string | null {
-  if (typeof v === 'number') return String(v).padStart(9, '0');
-  if (typeof v === 'string') {
-    const m = v.match(/\b(\d{3})\s?(\d{3})\s?(\d{3})\b/);
-    return m ? m[1] + m[2] + m[3] : v.trim() || null;
-  }
-  if (v && typeof v === 'object') {
-    for (const k of ORG_KEYS) if (k in (v as any)) return pickOrgnr((v as any)[k]);
-  }
-  return null;
-}
-
-export async function readInput(file: string): Promise<{ orgnrs: string[]; skipped: number; duplicates: number }> {
-  let buf = await fs.readFile(file);
-  if (file.endsWith('.gz') || (buf[0] === 0x1f && buf[1] === 0x8b)) buf = gunzipSync(buf);
-  const text = buf.toString('utf8').replace(/^﻿/, '');
-  const raw: string[] = [];
-  let skipped = 0;
-  const trimmed = text.trim();
-  if (trimmed.startsWith('[')) {
-    for (const item of JSON.parse(trimmed)) {
-      const o = pickOrgnr(item);
-      o ? raw.push(o) : skipped++;
-    }
-  } else {
-    for (const line of text.split(/\r?\n/)) {
-      const l = line.trim();
-      if (!l) continue;
-      let o: string | null = null;
-      if (l.startsWith('{')) {
-        try {
-          o = pickOrgnr(JSON.parse(l));
-        } catch {
-          o = null;
-        }
-      } else {
-        const m = l.match(/\b(\d{3})\s?(\d{3})\s?(\d{3})\b/);
-        o = m ? m[1] + m[2] + m[3] : null;
-      }
-      o ? raw.push(o) : skipped++; // header rows and blank cells land here
-    }
-  }
-  const seen = new Set<string>();
-  const orgnrs: string[] = [];
-  for (const o of raw) {
-    if (seen.has(o)) continue;
-    seen.add(o);
-    orgnrs.push(o);
-  }
-  return { orgnrs, skipped, duplicates: raw.length - orgnrs.length };
 }
 
 const pct = (xs: number[], p: number) => {

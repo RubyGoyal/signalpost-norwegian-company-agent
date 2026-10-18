@@ -13,7 +13,11 @@ npm ci
 npx tsx agent/run.ts <input-file> out
 ```
 
-- **Input:** a file of organisation numbers in `.txt`, `.csv`, `.jsonl` or `.json` format, optionally `.gz`. JSON records may use `organisation_number`, `organisasjonsnummer`, `orgnr`, `org_number` or `organizationNumber`. Header rows are skipped, spaces inside numbers are removed, and duplicates are merged.
+- **Input:** a file of organisation numbers in `.txt`, `.csv`, `.tsv`, `.jsonl` or `.json` format, optionally `.gz`.
+  - JSON records may use `organisation_number`, `organisasjonsnummer`, `orgnr`, `org_number`, `organizationNumber` or a similar name; failing that, the record's 9-digit value is used. A parent organisation number field is never used.
+  - In a CSV with a header row, the organisation-number column is found by name.
+  - `923 609 016`, `923.609.016` and `NO923609016MVA` are all read as `923609016`. Duplicates are merged.
+  - No row is dropped silently: a value with digits that is not a valid organisation number gets its own `failed` envelope (`invalid_organisation_number`). Only rows with no digits (headers, blank cells) are skipped, and they are counted in the run report.
 - **Output:**
   - `out/envelopes.jsonl`: exactly one terminal envelope per input organisation number, in input order.
   - `out/run-report.json`: counts by state, requests, runtime (p50/p95) and cost.
@@ -63,7 +67,7 @@ Optional flags and environment variables:
 
 ## Rules the agent follows
 
-- **Exact identity.** Every source is queried by the exact organisation number, after a modulus-11 check, so facts cannot attach to a namesake, parent or subsidiary.
+- **Exact identity.** Every Brønnøysund register is queried by the exact organisation number, after a modulus-11 check, so facts cannot attach to a namesake, parent or subsidiary. NAV job ads are attached only after the ad's own employer organisation number is confirmed (see below).
 - **No invented values.** A value is published only if the register holds it. If a register cannot be reached after retries, that family is `failed` and has no claims. If the identity lookup fails, the company is `failed` with zero claims.
 - **Missing is not zero.** An employee count is published only when the register says one is registered. Accounts figures are published only when present in the filing, and always with their reporting period.
 - **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage never shows up as removed facts.
@@ -91,13 +95,17 @@ Optional flags and environment variables:
 
 - **Models:** none. No LLM or paid API is used; all sources are free public APIs.
 - **Third-party cost per official run:** $0.
+- **Caches:** no external cache. The only stored data is the local `.signalpost-state/` folder with each company's previous snapshot, used to detect changes on refresh. Delete it for a cold start.
 - **Secrets:** none required. NAV's job feed uses its published public token, fetched at run time from `https://pam-stilling-feed.nav.no/api/publicToken`; a NAV-issued token can be supplied instead with `SIGNALPOST_NAV_TOKEN`. No keys are stored or logged. `.env*` files are git-ignored.
 - **Dependencies:** pinned in `package-lock.json`, installed with `npm ci`. Runtime: `tsx` (MIT). Web app: `express`, `react`, `vite`, `tailwindcss`, `lucide-react` (MIT / ISC).
 
 ## Tests
 
 ```bash
-npm run test:agent
+npm run test:agent                    # offline self-test
+npm run check:signalpost              # type check + offline self-test
+npm run check:signalpost-showcase     # builds the web app
+npm run check:signalpost-challenge    # live run on 10 well-known companies (examples/sample-orgnrs.txt)
 ```
 
 **Live smoke test (17 October 2026):** 100 randomly sampled real companies, all 100 envelopes `available`, 0 source errors, 0 integrity issues, 5,292 claims, 400 requests, 19 s, $0. An immediate re-run on the same companies detected 0 changes. Details are in [`examples/smoke-100-report.json`](examples/smoke-100-report.json), with the sample in `examples/smoke-100.txt`.
@@ -111,13 +119,15 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-This is an offline self-test (55 checks) against simulated registry responses. It covers:
+The offline self-test (64 checks) runs against simulated registry and NAV responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
 - missing-not-zero rules
 - evidence integrity
 - idempotent re-runs, real change detection, and no false removals during an outage
+- job ads: namesake employers rejected, inactive ads removed, NAV outage handled
+- input formats, unfamiliar column or key names, and malformed numbers
 
 ## Web app
 

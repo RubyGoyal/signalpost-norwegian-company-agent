@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { parseInputText } from '../input.ts';
 import type { Envelope } from '../types.ts';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
@@ -19,11 +20,11 @@ const check = (ok: boolean, msg: string) => {
   if (!ok) failures++;
 };
 
-function run(outName: string, env: Record<string, string> = {}, extra: string[] = []): Envelope[] {
+function run(outName: string, env: Record<string, string> = {}, extra: string[] = [], inFile = input): Envelope[] {
   const out = path.join(work, outName);
   execFileSync(
     process.execPath,
-    ['--import', 'tsx', '--import', path.join(root, 'agent/test/mock-fetch.ts'), path.join(root, 'agent/run.ts'), input, out, '--state-dir', stateDir, '--run-id', outName, ...extra],
+    ['--import', 'tsx', '--import', path.join(root, 'agent/test/mock-fetch.ts'), path.join(root, 'agent/run.ts'), inFile, out, '--state-dir', stateDir, '--run-id', outName, ...extra],
     { cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] }
   );
   return readFileSync(path.join(out, 'envelopes.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
@@ -126,6 +127,22 @@ check(!A4d.claims.some((c) => c.family === 'job_postings') && gone?.type === 're
 const r5 = run('run5', { MOCK_HANG: '910000098' }, ['--deadline-seconds', '3']);
 check(r5.length === 7, `deadline: still one envelope per input (got ${r5.length})`);
 check(by(r5, '910000098').state === 'failed' && by(r5, '910000098').errors[0]?.code === 'deadline_reached', 'deadline: unfinished company closed out as failed');
+
+// --- Input parsing: no organisation-number row is dropped -------------------------
+const p = (t: string) => parseInputText(t).orgnrs.join();
+check(p('Org. nr.;Navn\n910 000 063;A AS\n"910000098";B AS\n') === '910000063,910000098', 'input: CSV with a named org-number column and quoted cells');
+check(p('id,name,organisasjonsnummer\n1,A AS,910000063\n2,B AS,\n') === '910000063', 'input: CSV column picked by header name; blank cell skipped');
+check(p('NO910000063MVA\n910.000.098\n') === '910000063,910000098', 'input: "NO ... MVA" and dotted formats');
+check(p('{"company_org_number":"910000063"}\n{"id":7,"orgNumber":910000098}\n{"name":"X","value":"910000217"}\n') === '910000063,910000098,910000217', 'input: JSON Lines with unfamiliar key names');
+check(p('{"parent_orgnr":"910000098","company_orgnr":"910000063"}') === '910000063', 'input: a parent org-number field is never taken as the company');
+check(p('{"companies":[{"orgnr":"910000063"},{"orgnr":910000098}]}') === '910000063,910000098', 'input: JSON object wrapping an array');
+check(p('[910000063, "910000098", {"organisation_number": "910000217", "tags": []}]') === '910000063,910000098,910000217', 'input: JSON array of numbers, strings and records');
+const bad = parseInputText('orgnr\n91000006\n910000063\n');
+check(bad.orgnrs.join() === '91000006,910000063' && bad.skipped === 1, 'input: malformed number kept (reported as invalid), header skipped');
+const odd = path.join(work, 'odd.jsonl');
+writeFileSync(odd, ['{"OrgNo":"910 000 063"}', '{"orgnr":"91000006"}', '{"orgnr":"910000098"}'].join('\n'));
+const r6 = run('run6', {}, ['--jobs', 'off'], odd);
+check(r6.length === 3 && by(r6, '91000006')?.errors[0]?.code === 'invalid_organisation_number' && by(r6, '910000063')?.state === 'available', 'input: malformed number gets its own failed envelope, others processed');
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}  (work dir: ${work})`);
 process.exit(failures ? 1 : 0);
