@@ -1,0 +1,80 @@
+{
+  "description": "Live smoke test of v2 (hiring, public activity, extra registry fields) on the same 100 companies as examples/smoke-100-report.json, followed by an immediate re-run to check idempotent refresh.",
+  "how_it_was_run": "The agent code in agent/ (brreg.ts, extract.ts, profile.ts, jobs.ts, types.ts) was bundled with esbuild and run in a Chrome tab on pam-stilling-feed.nav.no from the entrant's laptop, with node:crypto/fs/path replaced by browser equivalents. The bundle's SHA-256 was checked in the browser before running. In that tab the browser blocks Regnskapsregisteret (no CORS for that origin), so annual accounts show as failed in this browser test only; accounts were covered by the v1 live test, and the command-line agent has no such restriction. Equivalent command: npx tsx agent/run.ts examples/smoke-100.txt out",
+  "sample": { "file": "examples/smoke-100.txt", "count": 100 },
+  "started_at": "2026-10-17T17:36:33.126Z",
+  "completed_at": "2026-10-17T17:40:29.695Z",
+  "nav_job_feed": {
+    "ok": true,
+    "token": "public",
+    "window_days": 60,
+    "window_from": "2026-08-18T17:34:11.836Z",
+    "window_to": "2026-10-17T19:33:47.315603+02:00",
+    "feed_pages": 124,
+    "entries_read": 122093,
+    "active_ads_indexed": 9618,
+    "build_seconds_in_browser": 141
+  },
+  "run_1": {
+    "envelope_count": 100,
+    "one_envelope_per_input": true,
+    "states": { "available": 100 },
+    "companies_with_family_available": {
+      "legal_identity": 100,
+      "registered_address": 100,
+      "industry": 100,
+      "status_flags": 100,
+      "roles": 100,
+      "group_structure": 100,
+      "public_activity": 89,
+      "locations": 75,
+      "contact_points": 63,
+      "employees": 23,
+      "official_website": 20,
+      "job_postings": 1,
+      "annual_accounts": "not measured in this browser tab (see how_it_was_run); 91 in the v1 live test"
+    },
+    "new_fields_in_v2": {
+      "is_group_member": 100,
+      "latest_filed_accounts_year": 92,
+      "share_capital": 86,
+      "former_name": 50,
+      "email": 40,
+      "mobile": 38,
+      "phone": 34,
+      "registry_event": 243,
+      "job_ad": 1
+    },
+    "job_postings": {
+      "companies_checked": 100,
+      "companies_with_confirmed_ads": 1,
+      "confirmed_ads": 1,
+      "matched_via_sub_unit": 1,
+      "example": "Kindergarten in Tromsø: ad published 2026-10-13, expires 2026-11-08, attached because the ad's employer organisation number is the company's registered sub-unit"
+    },
+    "registry_event_types": {
+      "employee count updated": 135,
+      "annual accounts filed": 90,
+      "industry code changed": 5,
+      "business address changed": 4,
+      "registered purpose changed": 3,
+      "VAT registration changed": 3,
+      "liquidation status changed": 2,
+      "legal name changed": 1,
+      "contact details changed": 1,
+      "website changed": 1,
+      "share capital changed": 1,
+      "postal address changed": 1
+    },
+    "total_claims_excluding_accounts": 2801,
+    "integrity_issues": 0,
+    "requests": 926
+  },
+  "run_2_refresh": {
+    "envelope_count": 100,
+    "states": { "available": 100 },
+    "changes_detected": 0,
+    "integrity_issues": 0,
+    "requests": 803
+  }
+}

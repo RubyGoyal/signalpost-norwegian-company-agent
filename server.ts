@@ -11,6 +11,7 @@ import path from 'node:path';
 import { createServer as createViteServer } from 'vite';
 import { BrregClient } from './agent/brreg.ts';
 import { validateOrgnr } from './agent/orgnr.ts';
+import { NavJobIndex } from './agent/jobs.ts';
 import { researchCompany, type RunContext } from './agent/profile.ts';
 import type { Envelope } from './agent/types.ts';
 
@@ -20,11 +21,26 @@ const REPORT_FILE = path.join(path.dirname(CORPUS_FILE), 'run-report.json');
 const REPO_URL = 'https://github.com/RubyGoyal/signalpost-norwegian-company-agent';
 
 const client = new BrregClient({ concurrency: 4, maxRequests: 100_000, timeoutMs: 20_000, maxRetries: 3 });
-const ctx = (): RunContext => ({
+// NAV job feed index, built at startup and refreshed hourly (SIGNALPOST_JOBS=off disables it).
+const JOBS_ON = (process.env.SIGNALPOST_JOBS || 'on') !== 'off';
+let jobsIndex: Promise<NavJobIndex> | null = null;
+let jobsBuiltAt = 0;
+function getJobs(): Promise<NavJobIndex> | null {
+  if (!JOBS_ON) return null;
+  if (!jobsIndex || Date.now() - jobsBuiltAt > 60 * 60 * 1000) {
+    jobsBuiltAt = Date.now();
+    jobsIndex = NavJobIndex.build(client, { days: Number(process.env.SIGNALPOST_JOBS_DAYS || 60), maxPages: 600 }).catch(() =>
+      NavJobIndex.failed('nav_job_index_error', 60)
+    );
+  }
+  return jobsIndex;
+}
+const ctx = async (): Promise<RunContext> => ({
   runId: `web-${new Date().toISOString().slice(0, 10)}`,
   client,
   stateDir: path.resolve(process.env.SIGNALPOST_STATE_DIR || '.signalpost-state'),
   maxLocationPages: 2,
+  jobs: (await getJobs()) ?? undefined,
 });
 
 // Batch results (from the last run) plus anything looked up live in the app.
@@ -118,7 +134,7 @@ async function startServer() {
       return;
     }
     try {
-      const envelope = await researchCompany(check.normalized, 0, ctx());
+      const envelope = await researchCompany(check.normalized, 0, await ctx());
       if (envelope.state !== 'failed') liveLookups.set(check.normalized, envelope);
       res.json({ envelope, origin: 'live' });
     } catch (err: any) {
@@ -176,8 +192,9 @@ async function startServer() {
       models: [],
       third_party_cost_usd: 0,
       sources: [
-        { name: 'Enhetsregisteret (entity, roles, sub-units)', url: 'https://data.brreg.no/enhetsregisteret/api/docs/index.html', licence: 'NLOD 2.0' },
+        { name: 'Enhetsregisteret (entity, roles, sub-units, update feed)', url: 'https://data.brreg.no/enhetsregisteret/api/docs/index.html', licence: 'NLOD 2.0' },
         { name: 'Regnskapsregisteret (annual accounts)', url: 'https://data.brreg.no/regnskapsregisteret/regnskap/', licence: 'NLOD 2.0' },
+        { name: 'NAV job vacancy feed (arbeidsplassen.no)', url: 'https://navikt.github.io/pam-stilling-feed/', licence: 'NAV API terms' },
       ],
     });
   });
@@ -192,6 +209,7 @@ async function startServer() {
   }
 
   const port = Number(process.env.PORT || 3000);
+  void getJobs();
   app.listen(port, '0.0.0.0', () => {
     process.stderr.write(`Signalpost app on http://localhost:${port} (batch results: ${path.relative(ROOT, CORPUS_FILE)})\n`);
   });

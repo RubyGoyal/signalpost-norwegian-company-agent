@@ -49,8 +49,9 @@ const FAMILY_LABELS: Record<FieldFamily, string> = {
   locations: 'Locations',
   annual_accounts: 'Annual accounts',
   official_website: 'Website',
+  contact_points: 'Contact points',
   group_structure: 'Group structure',
-  job_postings: 'Job postings',
+  job_postings: 'Hiring (NAV job ads)',
   public_activity: 'Public activity',
 };
 
@@ -89,6 +90,17 @@ const FIELD_LABELS: Record<string, string> = {
   parent_organisation_number: 'Parent organisation',
   is_parent_company: 'Parent company',
   files_group_accounts: 'Files group accounts',
+  business_register_date: 'Registered in Foretaksregisteret',
+  share_capital: 'Share capital',
+  former_name: 'Former name',
+  latest_filed_accounts_year: 'Latest filed accounts year',
+  is_group_member: 'Part of a group',
+  registry_notice: 'Registry notice',
+  email: 'Email (registered)',
+  phone: 'Phone (registered)',
+  mobile: 'Mobile (registered)',
+  job_ad: 'Job ad',
+  registry_event: 'Registry event',
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -96,6 +108,9 @@ const SOURCE_LABELS: Record<string, string> = {
   roller: 'Roles register',
   underenheter: 'Sub-unit register',
   regnskapsregisteret: 'Regnskapsregisteret',
+  oppdateringer: 'Registry update feed',
+  nav_job_feed: 'NAV job feed',
+  nav_job_ad: 'NAV job ad',
 };
 
 const REASON_TEXT: Record<string, string> = {
@@ -110,6 +125,9 @@ const REASON_TEXT: Record<string, string> = {
   no_employee_count_registered: 'Checked: no count registered',
   no_website_registered_in_enhetsregisteret: 'Checked: none registered',
   no_group_relation_registered: 'Checked: none registered',
+  no_contact_details_registered: 'Checked: none registered',
+  no_registry_events_since_2025: 'Checked: no events since 2025',
+  jobs_source_disabled: 'Not checked in this run',
 };
 
 const fmtNum = (n: number) => n.toLocaleString('en-US');
@@ -143,6 +161,25 @@ function formatValue(c: Claim): ReactNode {
         {v.holder_type === 'organisation' && v.organisation_number ? (
           <span className="font-mono text-slate-500"> · {v.organisation_number}</span>
         ) : null}
+      </span>
+    );
+  if (c.field === 'share_capital')
+    return `${v.currency || ''} ${fmtNum(v.amount)}${v.shares ? ` · ${fmtNum(v.shares)} shares` : ''}${v.registered_date ? ` · registered ${v.registered_date}` : ''}`;
+  if (c.field === 'former_name') return `${v.name}${v.from || v.to ? ` (${v.from || '?'} → ${v.to || '?'})` : ''}`;
+  if (c.field === 'registry_notice') return `${v.text}${v.date ? ` (${v.date})` : ''}`;
+  if (c.field === 'registry_event') return `${v.date}: ${v.event}`;
+  if (c.field === 'job_ad')
+    return (
+      <span>
+        <a href={v.nav_url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2">
+          {v.title}
+        </a>
+        <span className="text-slate-500">
+          {v.location ? ` · ${v.location}` : ''}
+          {v.published ? ` · published ${v.published}` : ''}
+          {v.expires ? ` · until ${v.expires}` : ''}
+          {v.matched_via === 'sub_unit' && v.employer_name ? ` · via ${v.employer_name}` : ''}
+        </span>
       </span>
     );
   if (c.field === 'sub_unit')
@@ -790,7 +827,7 @@ function AboutView() {
       <Card title="What it does">
         <ol className="list-decimal pl-5 space-y-2 text-sm text-slate-800">
           <li>Takes a Norwegian organisation number and checks its modulus-11 check digit.</li>
-          <li>Reads the official Brønnøysund registers for that exact number: the entity register, roles, sub-units and filed annual accounts.</li>
+          <li>Reads the official Brønnøysund registers for that exact number: the entity register, roles, sub-units, filed annual accounts and the registry's dated change log. Checks NAV's job feed for active job ads.</li>
           <li>Publishes only values the registers hold. Each fact links to the source, with retrieval time and, for accounts, the reporting period.</li>
           <li>On a re-check, compares with the previous snapshot and lists real changes only, keeping the earlier evidence.</li>
         </ol>
@@ -801,7 +838,8 @@ function AboutView() {
           <li>If a register cannot be reached, the result says so (“failed”) and shows nothing for it. Nothing is guessed or filled in.</li>
           <li>Missing values are never shown as zero.</li>
           <li>Birth dates of board members and managers are not published.</li>
-          <li>Not covered yet: job postings and public activity (news, procurement). They are marked “not checked”.</li>
+          <li>Job ads come from NAV's public job feed (arbeidsplassen.no). An ad is shown only when its employer organisation number is the company or one of its registered sub-units, and only while it is active. Contact persons are never shown.</li>
+          <li>Public activity is the registry's own dated change log (for example accounts filed, address or name changed). News and procurement are not covered yet.</li>
         </ul>
       </Card>
       <Card title="Run it yourself">

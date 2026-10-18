@@ -7,6 +7,7 @@ import type { BrregClient, FetchResult } from './brreg.ts';
 import {
   ClaimBuilder,
   extractAccounts,
+  extractActivity,
   extractEntity,
   extractLocations,
   extractRoles,
@@ -14,6 +15,7 @@ import {
   registryStatus,
   stableStringify,
 } from './extract.ts';
+import type { NavJobIndex } from './jobs.ts';
 import {
   FIELD_FAMILIES,
   type Change,
@@ -31,7 +33,18 @@ export interface RunContext {
   client: BrregClient;
   stateDir: string;
   maxLocationPages: number;
+  /** NAV job feed index for this run; undefined = job postings not checked. */
+  jobs?: NavJobIndex;
+  /** Max NAV ad detail look-ups per company (default 15). */
+  maxJobDetails?: number;
+  /** Earliest registry event to report as public activity (ISO date, fixed so refresh is stable). */
+  activitySince?: string;
 }
+
+export const DEFAULT_ACTIVITY_SINCE = '2025-01-01T00:00:00.000Z';
+
+/** Families whose earlier claims are history: they are never reported as removed. */
+const APPEND_ONLY: Set<FieldFamily> = new Set(['public_activity']);
 
 interface StoredState {
   organisation_number: string;
@@ -44,6 +57,8 @@ interface StoredState {
 }
 
 const NOT_CHECKED = 'not_checked_in_this_version';
+/** Availability reasons that mean "this run did not look", so absence is not a removal. */
+const UNCHECKED_REASONS = new Set([NOT_CHECKED, 'jobs_source_disabled', 'identity_not_resolved']);
 
 function emptyAvailability(state: FamilyAvailability['state'], reason: string) {
   return Object.fromEntries(
@@ -217,8 +232,60 @@ function buildSummary(
   else if (statusClaims.length)
     st.push({ text: 'Status: no bankruptcy, liquidation or forced-dissolution flags registered.', evidence_ids: ev(...statusClaims) });
 
+  const notices = all('registry_notice');
+  if (notices.length)
+    st.push({
+      text: `Registry notices: ${notices.map((n) => (n.value as any).text).join('; ')}.`,
+      evidence_ids: ev(...notices),
+    });
+
+  const cap = one('share_capital');
+  const former = all('former_name')
+    .slice()
+    .sort((a, b) => String((b.value as any).to || '').localeCompare(String((a.value as any).to || '')));
+  if (cap || former.length) {
+    const parts: string[] = [];
+    if (cap) {
+      const v = cap.value as any;
+      parts.push(`share capital ${v.currency || ''} ${fmtNum(v.amount)}${v.registered_date ? ` (registered ${v.registered_date})` : ''}`.replace('  ', ' '));
+    }
+    if (former.length)
+      parts.push(
+        `formerly registered as ${former
+          .slice(0, 3)
+          .map((f) => `${(f.value as any).name}${(f.value as any).to ? ` (until ${(f.value as any).to})` : ''}`)
+          .join(', ')}${former.length > 3 ? ` and ${former.length - 3} earlier name${former.length - 3 === 1 ? '' : 's'}` : ''}`
+      );
+    st.push({ text: `Identity: ${parts.join('; ')}.`, evidence_ids: ev(cap, ...former.slice(0, 3)) });
+  }
+
   const web = one('website');
   if (web) st.push({ text: `Website (as registered): ${(web.value as any).url}.`, evidence_ids: ev(web) });
+
+  const ads = all('job_ad');
+  if (ads.length) {
+    const top = ads[0].value as any;
+    st.push({
+      text: `Hiring: ${ads.length} active job ad${ads.length === 1 ? '' : 's'} on arbeidsplassen.no (NAV)${
+        top ? `, most recent "${top.title}"${top.published ? ` published ${top.published}` : ''}` : ''
+      }.`,
+      evidence_ids: ev(...ads.slice(0, 5)),
+    });
+  } else if (availability.job_postings.reason.startsWith('checked_nav_no_active_ads')) {
+    st.push({ text: 'Hiring: no active job ads found on arbeidsplassen.no (NAV) for this company or its sub-units.', evidence_ids: [] });
+  }
+
+  const events = all('registry_event')
+    .slice()
+    .sort((a, b) => String((b.value as any).date).localeCompare(String((a.value as any).date)));
+  if (events.length)
+    st.push({
+      text: `Recent registry activity: ${events
+        .slice(0, 3)
+        .map((e) => `${(e.value as any).date} ${(e.value as any).event}`)
+        .join('; ')}${events.length > 3 ? ` (${events.length} events since 2025)` : ''}.`,
+      evidence_ids: ev(...events.slice(0, 3)),
+    });
 
   if (baseline === 'cold_start') {
     st.push({ text: 'Changes: first run for this company, so there is no earlier snapshot to compare against.', evidence_ids: [] });
@@ -257,6 +324,9 @@ function buildSummary(
     if (r === 'identity_not_resolved') return `${f.replace(/_/g, ' ')} (not checked: identity not confirmed)`;
     if (r === 'not_found_in_enhetsregisteret') return `${f.replace(/_/g, ' ')} (organisation number not found in the registry)`;
     if (r === 'deleted_from_enhetsregisteret') return `${f.replace(/_/g, ' ')} (entity deleted from the registry)`;
+    if (r === 'jobs_source_disabled') return `${f.replace(/_/g, ' ')} (not checked in this run)`;
+    if (r.startsWith('checked_nav_no_active_ads')) return `${f.replace(/_/g, ' ')} (none active on NAV)`;
+    if (r === 'no_registry_events_since_2025') return `${f.replace(/_/g, ' ')} (no registry events since 2025)`;
     return `${f.replace(/_/g, ' ')} (none registered)`;
   };
   if (unknowns.length)
@@ -294,7 +364,24 @@ export async function researchCompany(rawOrgnr: string, inputIndex: number, ctx:
   let roles: FetchResult | null = null;
   let accounts: FetchResult | null = null;
   const locPages: FetchResult[] = [];
+  const actPages: FetchResult[] = [];
+  let jobsOutcome: 'ok' | 'error' | 'skipped' = 'skipped';
+  let jobsReason = 'jobs_source_disabled';
+  let jobsError: string | undefined;
   if (ent.outcome === 'ok') {
+    // Public activity: dated registry events since a fixed date. The feed is oldest-first,
+    // so when there are several pages the newest page is fetched too.
+    const since = ctx.activitySince || DEFAULT_ACTIVITY_SINCE;
+    const actTask = (async () => {
+      const base = `/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer=${orgnr}&dato=${encodeURIComponent(since)}&includeChanges=true&size=100`;
+      const first = await ctx.client.get('oppdateringer', `${base}&page=0`, snapId('oppdateringer:0'), count);
+      actPages.push(first);
+      const totalPages = first.json?.page?.totalPages;
+      if (first.outcome === 'ok' && Number.isFinite(totalPages) && totalPages > 1) {
+        const last = totalPages - 1;
+        actPages.push(await ctx.client.get('oppdateringer', `${base}&page=${last}`, snapId(`oppdateringer:${last}`), count));
+      }
+    })();
     const locTask = (async () => {
       for (let page = 0; page < ctx.maxLocationPages; page++) {
         const r = await ctx.client.get(
@@ -312,15 +399,70 @@ export async function researchCompany(rawOrgnr: string, inputIndex: number, ctx:
       ctx.client.get('roller', `/enhetsregisteret/api/enheter/${orgnr}/roller`, snapId('roller'), count),
       ctx.client.get('regnskapsregisteret', `/regnskapsregisteret/regnskap/${orgnr}`, snapId('regnskapsregisteret'), count),
       locTask,
+      actTask,
     ]);
-    snapshots.push(roles!.snapshot, accounts!.snapshot, ...locPages.map((p) => p.snapshot));
+    snapshots.push(roles!.snapshot, accounts!.snapshot, ...locPages.map((p) => p.snapshot), ...actPages.map((p) => p.snapshot));
     if (roles!.outcome === 'ok') extractRoles(b, roles!.snapshot, roles!.json);
     if (accounts!.outcome === 'ok') extractAccounts(b, accounts!.snapshot, accounts!.json);
     locPages.forEach((p, i) => p.outcome === 'ok' && extractLocations(b, p.snapshot, p.json, i * 100));
+    actPages.forEach((p, i) => p.outcome === 'ok' && extractActivity(b, p.snapshot, p.json, i));
     for (const [src, r] of [['roller', roles], ['regnskapsregisteret', accounts]] as const)
       if (r!.outcome === 'error') errors.push({ source: src, code: r!.snapshot.error || 'error', message: `${src} lookup failed after retries` });
     if (locPages.some((p) => p.outcome === 'error'))
       errors.push({ source: 'underenheter', code: 'error', message: 'sub-unit lookup failed after retries' });
+    if (actPages.some((p) => p.outcome === 'error'))
+      errors.push({ source: 'oppdateringer', code: 'error', message: 'registry update feed lookup failed after retries' });
+
+    // Hiring: NAV ads whose employer is this organisation number or one of its sub-units.
+    if (ctx.jobs) {
+      if (!ctx.jobs.info.ok) {
+        jobsOutcome = 'error';
+        jobsError = ctx.jobs.info.error || 'nav_job_index_unavailable';
+      } else if (locPages.some((p) => p.outcome === 'error')) {
+        // Without the sub-unit list, ads posted under a workplace number cannot be confirmed.
+        jobsOutcome = 'error';
+        jobsError = 'sub_units_unavailable';
+      } else {
+        const orgnrs = new Map<string, 'company' | 'sub_unit'>([[orgnr, 'company']]);
+        const names: string[] = [];
+        if (typeof ent.json?.navn === 'string') names.push(ent.json.navn);
+        for (const c of b.claims)
+          if (c.field === 'sub_unit') {
+            const v = c.value as any;
+            orgnrs.set(String(v.sub_unit_organisation_number), 'sub_unit');
+            if (v.name) names.push(String(v.name));
+          }
+        const res = await ctx.jobs.confirm(ctx.client, names, orgnrs, ctx.maxJobDetails ?? 15, count);
+        const feedSnap: SourceSnapshot = {
+          id: 'snap:nav:feed',
+          source: 'nav_job_feed',
+          source_url: ctx.jobs.info.first_page_url,
+          source_class: 'official_job_board',
+          publisher: 'NAV (Arbeids- og velferdsetaten), arbeidsplassen.no',
+          licence: 'NAV job feed API terms (https://arbeidsplassen.nav.no/vilkar-api)',
+          retrieved_at: ctx.jobs.info.retrieved_at,
+          http_status: 200,
+          content_sha256: null,
+          ok: true,
+        };
+        snapshots.push(feedSnap);
+        for (const ad of res.ads) {
+          snapshots.push(ad.snapshot);
+          const { snapshot, uuid, ...value } = ad;
+          b.add(snapshot, 'job_postings', 'job_ad', uuid, value as any, '$.ad_content', { sourceDate: ad.published });
+        }
+        if (res.ads.length) {
+          jobsOutcome = 'ok';
+          jobsReason = res.capped ? `found_in_source_first_${res.checked}_candidates_checked` : 'found_in_source';
+        } else if (res.errors > 0) {
+          jobsOutcome = 'error';
+          jobsError = 'nav_ad_detail_unavailable';
+        } else {
+          jobsOutcome = 'ok';
+          jobsReason = `checked_nav_no_active_ads_last_${ctx.jobs.info.window_days}_days`;
+        }
+      }
+    }
   }
 
   // 3. Availability per field family.
@@ -344,12 +486,30 @@ export async function researchCompany(rawOrgnr: string, inputIndex: number, ctx:
     locations: familyState(b, 'locations', ['underenheter'], locOutcome, locPages.length ? 'checked_no_active_sub_units' : 'identity_not_resolved'),
     annual_accounts: familyState(b, 'annual_accounts', ['regnskapsregisteret'], accounts ? (accounts.outcome === 'error' ? 'error' : 'ok') : 'skipped', accounts ? 'no_annual_accounts_in_regnskapsregisteret' : 'identity_not_resolved', accounts?.snapshot.error),
     official_website: familyState(b, 'official_website', ER, entOutcome, 'no_website_registered_in_enhetsregisteret', entErr),
+    contact_points: familyState(b, 'contact_points', ER, entOutcome, 'no_contact_details_registered', entErr),
     group_structure: familyState(b, 'group_structure', [...ER, 'regnskapsregisteret'], entOutcome, 'no_group_relation_registered', entErr),
-    job_postings: { state: 'not_available', reason: NOT_CHECKED, checked_sources: [] },
-    public_activity: { state: 'not_available', reason: NOT_CHECKED, checked_sources: [] },
+    job_postings: familyState(
+      b,
+      'job_postings',
+      ['nav_job_feed'],
+      ent.outcome !== 'ok' ? 'skipped' : jobsOutcome,
+      ent.outcome !== 'ok' ? 'identity_not_resolved' : jobsReason,
+      jobsError
+    ),
+    public_activity: familyState(
+      b,
+      'public_activity',
+      ['oppdateringer'],
+      !actPages.length ? 'skipped' : actPages.some((p) => p.outcome === 'error') ? 'error' : 'ok',
+      actPages.length ? 'no_registry_events_since_2025' : 'identity_not_resolved'
+    ),
   };
   if (truncated && availability.locations.state === 'available')
     availability.locations = { ...availability.locations, reason: `found_in_source_first_${locPages.length * 100}_only` };
+  if (availability.job_postings.state === 'available' && jobsReason !== 'found_in_source')
+    availability.job_postings = { ...availability.job_postings, reason: jobsReason };
+  // "jobs_source_disabled" is a skip with checked_sources cleared.
+  if (ent.outcome === 'ok' && !ctx.jobs) availability.job_postings = { state: 'not_available', reason: 'jobs_source_disabled', checked_sources: [] };
 
   // Overall state follows the identity anchor. Deleted (410) and unknown (404) numbers
   // are reported as not_available rather than guessed at.
@@ -388,10 +548,12 @@ export async function researchCompany(rawOrgnr: string, inputIndex: number, ctx:
     }
     for (const old of prev.claims) {
       if (curByKey.has(old.key)) continue;
-      // Only report a removal when that family was actually re-checked successfully.
+      // Only report a removal when that family was actually re-checked successfully,
+      // and never for history-type families (a past registry event stays true).
+      if (APPEND_ONLY.has(old.family)) continue;
       const s = families(old);
       if (s !== 'available' && s !== 'not_available') continue;
-      if (availability[old.family].reason === NOT_CHECKED) continue;
+      if (UNCHECKED_REASONS.has(availability[old.family]?.reason)) continue;
       changes.push({ type: 'removed_value', key: old.key, family: old.family, field: old.field, previous_value: old.value, new_value: null, previous_evidence: old.evidence_ids.map((id) => prevEv.get(id)).filter(Boolean) as Evidence[], evidence_ids: [], previous_retrieved_at: old.retrieved_at, detected_at: now });
     }
   }
@@ -399,7 +561,13 @@ export async function researchCompany(rawOrgnr: string, inputIndex: number, ctx:
   // Persist: keep earlier claims for families that failed this run so evidence is not lost.
   // A run where the identity lookup failed never overwrites the stored snapshot.
   if (state !== 'failed') {
-    const keepFromPrev = prev ? prev.claims.filter((c) => availability[c.family]?.state === 'failed') : [];
+    const keepFromPrev = prev
+      ? prev.claims.filter(
+          (c) =>
+            availability[c.family]?.state === 'failed' ||
+            (UNCHECKED_REASONS.has(availability[c.family]?.reason) && !claims.some((x) => x.key === c.key))
+        )
+      : [];
     const keepEvIds = new Set(keepFromPrev.flatMap((c) => c.evidence_ids));
     const nextState: StoredState = {
       organisation_number: orgnr,

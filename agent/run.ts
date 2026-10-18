@@ -11,6 +11,7 @@ import { createWriteStream, promises as fs } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { BrregClient } from './brreg.ts';
+import { NavJobIndex, type JobIndexInfo } from './jobs.ts';
 import { failedEnvelope, researchCompany, type RunContext } from './profile.ts';
 import { FIELD_FAMILIES, type Envelope } from './types.ts';
 
@@ -109,7 +110,7 @@ async function main() {
   const runId = flags['run-id'] || process.env.SIGNALPOST_RUN_ID || `run-${startedAt.replace(/[:.]/g, '-')}`;
   const stateDir = path.resolve(flags['state-dir'] || process.env.SIGNALPOST_STATE_DIR || '.signalpost-state');
   const concurrency = Number(flags.concurrency || process.env.SIGNALPOST_CONCURRENCY || 8);
-  const maxRequests = Number(flags['max-requests'] || process.env.SIGNALPOST_MAX_REQUESTS || 8000);
+  const maxRequests = Number(flags['max-requests'] || process.env.SIGNALPOST_MAX_REQUESTS || 20000);
   const deadlineSec = Number(flags['deadline-seconds'] || process.env.SIGNALPOST_DEADLINE_SECONDS || 0);
 
   await fs.mkdir(outDir, { recursive: true });
@@ -122,6 +123,7 @@ async function main() {
 
   const client = new BrregClient({ concurrency, maxRequests, timeoutMs: 20_000, maxRetries: 3 });
   const ctx: RunContext = { runId, client, stateDir, maxLocationPages: Number(process.env.SIGNALPOST_MAX_LOCATION_PAGES || 2) };
+  let jobsInfo: JobIndexInfo | null = null;
 
   // Stream each envelope as soon as it is done, so a crash still leaves completed rows.
   const streamPath = path.join(outDir, 'envelopes.partial.jsonl');
@@ -183,7 +185,12 @@ async function main() {
       per_company_runtime_ms: { p50: pct(runtimes, 50), p95: pct(runtimes, 95) },
       third_party_cost_usd: 0,
       models_used: [],
-      sources: ['data.brreg.no Enhetsregisteret', 'data.brreg.no Regnskapsregisteret'],
+      sources: [
+        'data.brreg.no Enhetsregisteret (entities, roles, sub-units, update feed)',
+        'data.brreg.no Regnskapsregisteret',
+        ...(jobsInfo ? ['pam-stilling-feed.nav.no (NAV job vacancy feed)'] : []),
+      ],
+      nav_job_feed: jobsInfo,
     };
     await fs.writeFile(path.join(outDir, 'run-report.json'), JSON.stringify(report, null, 2));
     process.stdout.write(
@@ -217,6 +224,24 @@ async function main() {
         }, deadlineSec * 1000);
       })
     : null;
+
+  // Hiring source: read NAV's job feed once for the whole run (SIGNALPOST_JOBS=off skips it).
+  // The read is time-boxed; if it fails, job postings are reported as failed, never guessed.
+  if ((flags.jobs || process.env.SIGNALPOST_JOBS || 'on') !== 'off') {
+    const days = Number(flags['jobs-days'] || process.env.SIGNALPOST_JOBS_DAYS || 60);
+    const limitMs = (deadlineSec > 0 ? Math.min(180, deadlineSec * 0.3) : 240) * 1000;
+    const tj = Date.now();
+    process.stderr.write(`signalpost: reading NAV job feed (last ${days} days)...\n`);
+    const built = await Promise.race([
+      NavJobIndex.build(client, { days, maxPages: Number(process.env.SIGNALPOST_JOBS_MAX_PAGES || 600) }),
+      new Promise<null>((r) => setTimeout(() => r(null), limitMs)),
+    ]);
+    ctx.jobs = built || NavJobIndex.failed('nav_job_index_timeout', days);
+    jobsInfo = ctx.jobs.info;
+    process.stderr.write(
+      `signalpost: NAV job feed ${jobsInfo.ok ? 'ready' : `unavailable (${jobsInfo.error})`}: ${jobsInfo.feed_pages} pages, ${jobsInfo.active_ads} active ads, ${Math.round((Date.now() - tj) / 1000)}s\n`
+    );
+  }
 
   let next = 0;
   const workers = Array.from({ length: Math.max(1, concurrency * 2) }, async () => {

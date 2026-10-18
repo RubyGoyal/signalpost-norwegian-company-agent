@@ -203,8 +203,153 @@ export function extractEntity(b: ClaimBuilder, snap: SourceSnapshot, e: any) {
     );
   }
 
+  if (isNonEmptyString(e.registreringsdatoForetaksregisteret))
+    add(
+      'legal_identity',
+      'business_register_date',
+      null,
+      e.registreringsdatoForetaksregisteret,
+      '$.registreringsdatoForetaksregisteret'
+    );
+
+  // Share capital, with the date it was registered.
+  const kap = e.kapital;
+  if (kap && isNumber(kap.belop)) {
+    const k = kap;
+    const cap: Record<string, unknown> = { amount: k.belop };
+    if (isNonEmptyString(k.valuta)) cap.currency = k.valuta;
+    if (isNumber(k.antallAksjer)) cap.shares = k.antallAksjer;
+    if (isNonEmptyString(k.type)) cap.type = k.type;
+    if (isNonEmptyString(k.innfortDato)) cap.registered_date = k.innfortDato;
+    add('legal_identity', 'share_capital', null, cap, '$.kapital', {
+      ...(isNonEmptyString(k.valuta) ? { unit: k.valuta } : {}),
+      sourceDate: isNonEmptyString(k.innfortDato) ? k.innfortDato : null,
+    });
+  }
+
+  // Former legal names with the period each was used (helps match the public brand).
+  if (Array.isArray(e.historiskeNavn)) {
+    e.historiskeNavn.forEach((h: any, i: number) => {
+      if (!isNonEmptyString(h?.navn)) return;
+      const v: Record<string, unknown> = { name: h.navn };
+      if (isNonEmptyString(h.fraDato)) v.from = h.fraDato.slice(0, 10);
+      if (isNonEmptyString(h.tilDato)) v.to = h.tilDato.slice(0, 10);
+      add('legal_identity', 'former_name', `${h.navn}#${v.from || ''}`, v, `$.historiskeNavn[${i}]`, {
+        sourceDate: (v.to as string) || null,
+      });
+    });
+  }
+
+  if (isNonEmptyString(e.sisteInnsendteAarsregnskap))
+    add(
+      'annual_accounts',
+      'latest_filed_accounts_year',
+      null,
+      e.sisteInnsendteAarsregnskap,
+      '$.sisteInnsendteAarsregnskap'
+    );
+
+  if (typeof e.erIKonsern === 'boolean')
+    add('group_structure', 'is_group_member', null, e.erIKonsern, '$.erIKonsern');
+
+  // Registry notices (påtegninger), e.g. a missing auditor or board.
+  if (Array.isArray(e.paategninger)) {
+    e.paategninger.forEach((p: any, i: number) => {
+      const text = isNonEmptyString(p?.tekst) ? p.tekst : isNonEmptyString(p) ? p : '';
+      if (!text) return;
+      const v: Record<string, unknown> = { text };
+      if (isNonEmptyString(p?.infotype)) v.type = p.infotype;
+      const date = isNonEmptyString(p?.innfoertDato) ? p.innfoertDato : null;
+      if (date) v.date = date;
+      add('status_flags', 'registry_notice', `${v.type || ''}#${text.slice(0, 40)}`, v, `$.paategninger[${i}]`, {
+        sourceDate: date,
+      });
+    });
+  }
+
+  // Registered contact points. Not published for sole proprietorships (ENK), where the
+  // contact details are a private person's.
+  if (e?.organisasjonsform?.kode !== 'ENK') {
+    if (isNonEmptyString(e.epostadresse))
+      add('contact_points', 'email', null, e.epostadresse.trim(), '$.epostadresse', { confidence: 0.95 });
+    if (isNonEmptyString(e.telefon))
+      add('contact_points', 'phone', null, e.telefon.trim(), '$.telefon', { confidence: 0.95 });
+    if (isNonEmptyString(e.mobil))
+      add('contact_points', 'mobile', null, e.mobil.trim(), '$.mobil', { confidence: 0.95 });
+  }
+
   if (isNonEmptyString(e.overordnetEnhet))
     add('group_structure', 'parent_organisation_number', null, e.overordnetEnhet, '$.overordnetEnhet');
+}
+
+// ---------------------------------------------------------------------------
+// Public activity: Enhetsregisteret update feed for this organisation number
+// (/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer=…&includeChanges=true).
+// Each dated registry event becomes one claim. Events are history, so they are never
+// reported as "removed" when they fall outside the fetched window.
+// ---------------------------------------------------------------------------
+const ACTIVITY_LABELS: [RegExp, string][] = [
+  [/^\/navn$/, 'legal name changed'],
+  [/^\/organisasjonsform/, 'organisation form changed'],
+  [/^\/forretningsadresse/, 'business address changed'],
+  [/^\/postadresse/, 'postal address changed'],
+  [/^\/naeringskode/, 'industry code changed'],
+  [/^\/vedtektsfestetFormaal|^\/aktivitet/, 'registered purpose changed'],
+  [/^\/antallAnsatte$/, 'employee count updated'],
+  [/^\/sisteInnsendteAarsregnskap$/, 'annual accounts filed'],
+  [/^\/hjemmeside$/, 'website changed'],
+  [/^\/kapital/, 'share capital changed'],
+  [/^\/konkurs/, 'bankruptcy status changed'],
+  [/^\/underAvvikling/, 'liquidation status changed'],
+  [/^\/underTvangsavvikling/, 'forced dissolution status changed'],
+  [/^\/registrertIMvaregisteret$/, 'VAT registration changed'],
+  [/^\/registrertIForetaksregisteret$/, 'business register status changed'],
+  [/^\/epostadresse|^\/telefon|^\/mobil/, 'contact details changed'],
+  [/^\/paategninger/, 'registry notice changed'],
+];
+// Values safe to quote in the activity text (no personal data).
+const QUOTABLE = /^\/(navn|antallAnsatte|sisteInnsendteAarsregnskap|hjemmeside|konkurs|underAvvikling|registrertIMvaregisteret)$/;
+
+export function extractActivity(b: ClaimBuilder, snap: SourceSnapshot, page: any, offset: number) {
+  const items = Array.isArray(page?._embedded?.oppdaterteEnheter) ? page._embedded.oppdaterteEnheter : [];
+  items.forEach((u: any, i: number) => {
+    const type = isNonEmptyString(u?.endringstype) ? u.endringstype : 'Ukjent';
+    const date = isNonEmptyString(u?.dato) ? u.dato : null;
+    if (!date || u?.oppdateringsid === undefined) return;
+    const changes = Array.isArray(u.endringer) ? u.endringer : [];
+    const labels = new Set<string>();
+    const details: string[] = [];
+    for (const c of changes) {
+      const p = String(c?.path || '');
+      if (/^\/registreringsdato|^\/_links/.test(p)) continue; // bookkeeping dates, not events
+      const hit = ACTIVITY_LABELS.find(([re]) => re.test(p));
+      if (!hit) continue;
+      labels.add(hit[1]);
+      if (QUOTABLE.test(p) && c.value !== undefined && c.value !== null && typeof c.value !== 'object')
+        details.push(`${hit[1]}: ${c.value}`);
+    }
+    // Skip events that say nothing (old "Ukjent" entries without change details).
+    if (type === 'Ukjent' && labels.size === 0) return;
+    if (type === 'Endring' && labels.size === 0) return;
+    const summary =
+      type === 'Ny'
+        ? 'registered in Enhetsregisteret'
+        : type === 'Sletting'
+        ? 'deleted from Enhetsregisteret'
+        : details.length
+        ? details.join('; ')
+        : [...labels].join('; ');
+    b.add(
+      snap,
+      'public_activity',
+      'registry_event',
+      String(u.oppdateringsid),
+      { date: date.slice(0, 10), event: summary, change_type: type, fields: [...labels] },
+      `$._embedded.oppdaterteEnheter[${i}]`,
+      { sourceDate: date.slice(0, 10) }
+    );
+  });
+  void offset;
 }
 
 export function registryStatus(

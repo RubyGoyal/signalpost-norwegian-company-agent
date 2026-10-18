@@ -18,6 +18,7 @@ export const FIELD_FAMILIES = [
   'locations',
   'annual_accounts',
   'official_website',
+  'contact_points',
   'group_structure',
   'job_postings',
   'public_activity',
@@ -25,13 +26,24 @@ export const FIELD_FAMILIES = [
 
 export type FieldFamily = (typeof FIELD_FAMILIES)[number];
 
+export type SourceName =
+  | 'enhetsregisteret'
+  | 'roller'
+  | 'underenheter'
+  | 'regnskapsregisteret'
+  | 'oppdateringer'
+  | 'nav_job_feed'
+  | 'nav_job_ad';
+
+export type SourceClass = 'official_registry' | 'official_job_board';
+
 export interface SourceSnapshot {
   id: string;
-  source: 'enhetsregisteret' | 'roller' | 'underenheter' | 'regnskapsregisteret';
+  source: SourceName;
   source_url: string;
-  source_class: 'official_registry';
-  publisher: 'Brønnøysundregistrene';
-  licence: 'NLOD 2.0';
+  source_class: SourceClass;
+  publisher: string;
+  licence: string;
   retrieved_at: string;
   http_status: number | null;
   content_sha256: string | null;
@@ -48,7 +60,7 @@ export interface Evidence {
   id: string;
   snapshot_id: string;
   source_url: string;
-  source_class: 'official_registry';
+  source_class: SourceClass;
   retrieved_at: string;
   content_sha256: string | null;
   /** JSON path inside the source response that holds the value. */
