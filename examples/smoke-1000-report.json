@@ -1,0 +1,80 @@
+{
+  "description": "Live test of the submitted agent (commit 86506bbc0142865f7e089de0853d9d61ed8f24f0) on 1,000 companies drawn at random from Builderr's official company list, followed by an immediate re-run to check idempotent refresh.",
+  "run_date": "2026-10-21",
+  "sample": {
+    "file": "examples/smoke-1000.txt",
+    "count": 1000,
+    "drawn_from": "https://builderr.ai/signalpost-company-universe-2025.jsonl.gz (411,160 companies)",
+    "method": "mulberry32 pseudo-random generator, seed 20261021, 1,000 distinct rows",
+    "legal_forms": { "AS": 909, "BRL": 24, "ESEK": 18, "STI": 17, "NUF": 12, "FLI": 9, "SA": 3, "ENK": 2, "other": 6 }
+  },
+  "how_it_was_run": "The agent's own source files (agent/brreg.ts, profile.ts, extract.ts, jobs.ts, types.ts, orgnr.ts) were downloaded from GitHub at the submitted commit, checked by SHA-256 against the commit, bundled with esbuild-wasm and run in a browser tab on data.brreg.no (node:crypto/fs/path replaced by browser equivalents). Hiring was run separately from a tab on pam-stilling-feed.nav.no, because NAV's feed only answers its own origin; in that tab annual accounts cannot be read, so the hiring run is used for hiring figures only. Equivalent command: npx tsx agent/run.ts examples/smoke-1000.txt out",
+  "registry_run_1": {
+    "envelope_count": 1000,
+    "one_envelope_per_input": true,
+    "states": { "available": 1000 },
+    "integrity_issues": 0,
+    "total_claims": 60012,
+    "requests": 5012,
+    "runtime_seconds": 228,
+    "per_company_runtime_ms": { "p50": 3104, "p95": 5041, "max": 26217 },
+    "source_errors": { "regnskapsregisteret http 500 after retries": 1 },
+    "companies_with_family_available": {
+      "legal_identity": 1000,
+      "status_flags": 1000,
+      "group_structure": 1000,
+      "public_activity": 1000,
+      "annual_accounts": 999,
+      "industry": 999,
+      "registered_address": 999,
+      "roles": 999,
+      "locations": 749,
+      "contact_points": 375,
+      "employees": 149,
+      "official_website": 108
+    },
+    "not_available_reasons": {
+      "official_website: no website registered in Enhetsregisteret": 892,
+      "employees: no employee count registered": 851,
+      "contact_points: no contact details registered": 625,
+      "locations: checked, no active sub-units": 251
+    }
+  },
+  "registry_run_2_refresh": {
+    "envelope_count": 1000,
+    "states": { "available": 1000 },
+    "changes_detected": 0,
+    "companies_with_different_claim_ids": 0,
+    "integrity_issues": 0,
+    "requests": 5003,
+    "runtime_seconds": 190
+  },
+  "agreement_with_builderr_universe_file": {
+    "note": "The universe file is a snapshot from earlier in 2026; the agent reads the live registers, so some differences are real changes since the snapshot.",
+    "legal_name": { "match": 997, "different": 3, "example": "922781745: ARILD NORDHEIM MASKINENTREPRENØR AS is now ARILD NORDHEIM ENTREPRENØR AS" },
+    "industry_code": { "match": 981, "different": 18 },
+    "municipality": { "match": 978, "different": 11, "example": "997045505: moved from Oslo to Ullensaker" },
+    "registered_website": { "match": 103, "only_in_live_register": 5 },
+    "latest_filed_accounts_year": { "match": 999, "different": 1, "example": "975854795 has since been deleted from the register" },
+    "employees": { "match": 58, "different": 84, "example": "933220044: 9 in the snapshot, 10 now" }
+  },
+  "hiring_run": {
+    "nav_job_feed": { "ok": true, "window_days": 60, "feed_pages": 122, "entries_read": 120561, "active_ads_indexed": 9016, "index_seconds": 89 },
+    "companies_with_confirmed_ads": 1,
+    "confirmed_ads": 1,
+    "integrity_issues": 0,
+    "re_run_job_changes": 0
+  },
+  "hiring_recall_check": {
+    "method": "Separately, every active NAV ad in the same 60-day window (9,030) was opened and its employer organisation number compared with the 1,000 companies and their 894 registered sub-units.",
+    "companies_with_active_ads": 3,
+    "active_ads": 6,
+    "found_by_agent": { "companies": 1, "ads": 1 },
+    "missed": [
+      "925036226 (HUMAN CARE UNG AS): 4 ads posted by two of its sub-units under the brand name 'Humana omsorg og assistanse'",
+      "931723499 (SOLBYEN MAKI HOUSE AS): 1 ad posted by its sub-unit under the brand name 'SushiTake Meny Sarpsborg'"
+    ],
+    "cause": "The agent finds candidate ads by employer name and then confirms the organisation number. Ads posted under a brand name never become candidates, and those companies are reported as having no active ads.",
+    "fix_direction": "Index every active ad by its employer organisation number once per run (about 9,000 detail requests), so matching never depends on the name."
+  }
+}
