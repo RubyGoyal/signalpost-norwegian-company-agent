@@ -628,6 +628,8 @@ const GENERIC_LINK = /^(les mer|les hele|se mer|mer|søk|søk her|søk nå|se st
 const JOB_HOSTS = /(^|\.)(teamtailor\.com|webcruiter\.(com|no)|jobbnorge\.no|finn\.no|arbeidsplassen\.nav\.no|recman\.(no|page)|hrmanager\.no|hr-manager\.net|jobylon\.com|reachmee\.com|easycruit\.com|simplyrecruit\.no|varbi\.com|talentech\.com|jobs\.lever\.co|boards\.greenhouse\.io|smartrecruiters\.com|workable\.com)$/i;
 // Pages under a careers section that describe the employer rather than an opening.
 const NOT_AN_OPENING = /(verdier|kultur|culture|values|fordeler|benefits|goder|hvorfor|why-|why |prosess|process|faq|sp[oø]rsm[aå]l|om-oss|om oss|about|medarbeidere|ansatte|v[aå]re-folk|v[aå]re folk|our-people|our people|\bteam\b|historier|stories|arbeidsmilj|kontakt|contact|personvern|privacy|[aå]pen-s[oø]knad|[aå]pen s[oø]knad|open-application|open application|abonner|subscribe|logg inn|login)/i;
+const LOOKS_LIKE_OPENING =
+  /(stilling|ledig|s[oø]ker|sommerjobb|sommervikar|vikariat|vikar|trainee|internship|praktikant|position|vacanc|opening|hiring|job|jobb|engineer|ingeni[oø]r|utvikler|developer|konsulent|consultant|leder|manager|selger|sales|tekniker|technician|elektriker|mekaniker|montør|operat[oø]r|sykepleier|r[aå]dgiver|advisor|spesialist|specialist|koordinator|coordinator|assistent|assistant|medarbeider|sjåfør|sjafor|driver|kokk|servit|butikkmedarbeider|l[aæ]rer|teacher|regnskapsf[oø]rer|accountant|controller|analytiker|analyst|arkitekt|architect|designer|prosjekt|project)/i;
 const JOB_AD_HINT = /(\/jobs?\/[\w-]*\d|\/job\/|finnkode=|advertid=|\/stilling\/|\/ledige-stillinger\/stilling\/|\/vacanc|\/position|\/annonse|\/job-ad|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 
 export interface SiteNewsItem { date: string; title: string; url: string; snapshot: SourceSnapshot; via: string }
@@ -716,6 +718,8 @@ function jobNodes(html: string): { title: string; posted: string | null; expires
 }
 
 function findSectionLink(pages: PageAnalysis[], domain: string, path: RegExp, text: RegExp): string | null {
+  // Prefer the section's own page (/nyheter, /karriere) over a single article or posting inside it.
+  let best: { url: string; score: number } | null = null;
   for (const p of pages)
     for (const l of p.links) {
       let u: URL;
@@ -725,9 +729,14 @@ function findSectionLink(pages: PageAnalysis[], domain: string, path: RegExp, te
         continue;
       }
       if (registrableDomain(u.hostname) !== domain) continue;
-      if (path.test(u.pathname) || text.test(l.text.trim())) return `${u.origin}${u.pathname}`;
+      const segs = u.pathname.split('/').filter(Boolean);
+      const pathHit = path.test(u.pathname);
+      const textHit = text.test(l.text.trim());
+      if (!pathHit && !textHit) continue;
+      const score = pathHit && segs.length <= 2 && path.test(`/${segs[segs.length - 1]}/`) ? 0 : textHit ? 1 : 2;
+      if (!best || score < best.score) best = { url: `${u.origin}${u.pathname}`, score };
     }
-  return null;
+  return best?.url ?? null;
 }
 
 /** Reads the verified site's news page and careers page (one request each, robots.txt honoured). */
@@ -804,7 +813,8 @@ export async function readSiteActivity(
           u.pathname.replace(/\/$/, '').startsWith(`${careersPath}/`) &&
           u.pathname.replace(/\/$/, '') !== careersPath;
         if (!external && !own) continue;
-        if (own && (NOT_AN_OPENING.test(title) || NOT_AN_OPENING.test(u.pathname))) continue;
+        // A page under the careers section counts only when it reads like an opening.
+        if (own && (NOT_AN_OPENING.test(title) || NOT_AN_OPENING.test(u.pathname) || !LOOKS_LIKE_OPENING.test(`${title} ${u.pathname}`))) continue;
         const url = `${u.origin}${u.pathname}${u.search}`;
         if (seen.has(url)) continue;
         seen.add(url);
