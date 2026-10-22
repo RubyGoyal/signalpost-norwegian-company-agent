@@ -469,14 +469,19 @@ export async function verifyCandidate(
   if (nameHit) {
     const substantive = homeA.text.length >= 200;
     if (cand.via !== 'name_domain_check' && (tokens.length >= 2 || substantive))
-      return v('exact', 'legal_name_on_site', { ...base, method: 'legal_name_on_site', confidence: 0.9, proof: { page: homeA, span: `homepage name: ${nameHit}`.slice(0, 200) } });
+      return v('exact', 'legal_name_on_site', {
+        ...base,
+        method: 'legal_name_on_site',
+        confidence: 0.9,
+        proof: homeName ? { page: homeA, span: `homepage name: ${homeName}`.slice(0, 200) } : { page: inText!.page, span: `legal name on the page: ${inText!.text}`.slice(0, 200) },
+      });
     const contact = contactMatch(pages, id);
     if (contact)
       return v('exact', 'legal_name_and_contact_details_on_site', {
         ...base,
         method: 'legal_name_and_contact_details_on_site',
         confidence: 0.9,
-        proof: { page: contact.page, span: `homepage name: ${nameHit}; ${contact.what}`.slice(0, 200) },
+        proof: { page: contact.page, span: `${homeName ? `homepage name: ${homeName}` : `legal name on the page: ${inText?.text}`}; ${contact.what}`.slice(0, 200) },
       });
     return v('rejected', 'name_only_without_contact_match', base);
   }

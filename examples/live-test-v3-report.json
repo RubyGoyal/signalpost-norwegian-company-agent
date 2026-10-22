@@ -1,0 +1,52 @@
+{
+  "description": "Live checks of this version (websites, company-owned profiles, hiring by organisation number) on the same 1,000 companies as examples/smoke-1000-report.json, drawn at random from Builderr's official company list.",
+  "run_date": "2026-10-22",
+  "how_it_was_run": "The agent's source files were downloaded from GitHub at the tested commit, checked by SHA-256, bundled with esbuild-wasm and run in browser tabs (node:crypto/fs/path replaced by browser equivalents): registry research from a data.brreg.no tab, the NAV index from a pam-stilling-feed.nav.no tab, and website verification on each company's own site (a browser page can read only its own site, so the website step was checked site by site rather than for all 1,000). Equivalent command: npx tsx agent/run.ts examples/smoke-1000.txt out",
+  "registry_research": {
+    "commit": "af2952f42ab1a0c07b9847b21af07852facaa111",
+    "envelope_count": 1000,
+    "states": { "available": 1000 },
+    "integrity_issues": 0,
+    "total_claims": 60016,
+    "requests": 5003,
+    "runtime_seconds": 183,
+    "per_company_runtime_ms": { "p50": 5618, "p95": 7818 },
+    "registered_websites": 108,
+    "registered_social_page_published_as_profile": 1,
+    "companies_with_email_domain_candidate": 113,
+    "companies_with_name_domain_candidates": 880,
+    "re_run": { "changes_detected": 0, "companies_with_different_claim_ids": 0, "top_level_changes": 0, "runtime_seconds": 181 }
+  },
+  "hiring_by_organisation_number": {
+    "commit": "af2952f42ab1a0c07b9847b21af07852facaa111",
+    "feed_pages": 124,
+    "active_ads": 9275,
+    "ad_details_read": 9275,
+    "detail_read_complete": true,
+    "detail_errors": 0,
+    "detail_read_seconds_in_browser": 250,
+    "index_seconds_in_browser": 337,
+    "companies_with_active_ads": 3,
+    "active_ads_attached": 5,
+    "previous_version": { "companies_with_active_ads": 1, "active_ads_attached": 1 },
+    "found_now": [
+      "925036226 HUMAN CARE UNG AS: 3 ads posted by its sub-units under the brand name 'Humana omsorg og assistanse'",
+      "931723499 SOLBYEN MAKI HOUSE AS: 1 ad posted by its sub-unit under the brand name 'SushiTake Meny Sarpsborg'",
+      "930202258: 1 ad posted by its sub-unit (a kindergarten), found before as well"
+    ]
+  },
+  "website_verification_on_real_sites": {
+    "commit": "83a9da155f8432c58fe238c8c739f79f3178c81f",
+    "checked": 7,
+    "results": [
+      { "company": "980894002", "candidate": "registered website", "result": "not published: placeholder page ('Coming Soon')" },
+      { "company": "924291370", "candidate": "registered website", "result": "verified by the company name on the homepage", "contact_links": "phone" },
+      { "company": "953079798", "candidate": "registered website", "result": "verified by the full legal name in the page footer" },
+      { "company": "974456923", "candidate": "registered website", "result": "verified by the organisation number on the site", "profiles": ["https://facebook.com/FlexiformAS", "https://instagram.com/flexiform.no", "https://linkedin.com/company/flexiform-as"], "contact_links": "email and phone" },
+      { "company": "971177470", "candidate": "registered email domain (no website registered)", "result": "verified by the full legal name on the page", "contact_links": "email" },
+      { "company": "971000341", "candidate": "registered email domain (no website registered)", "result": "verified by the company name on the homepage", "contact_links": "email and two phone numbers" },
+      { "company": "953452626", "candidate": "registered email domain coop.no", "result": "not published: the site is the Coop group's, not this entity's" }
+    ],
+    "note": "Two of these sites (953079798, 971177470) were not verified by the first version of the check; reading the full legal name in the page text fixed both, without letting group sites through."
+  }
+}

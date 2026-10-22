@@ -131,6 +131,17 @@ npm run check:signalpost-challenge    # live run on 10 well-known companies (exa
 
 **1,000-company live test (21 October 2026, the version before this one):** 1,000 companies drawn at random from Builderr's official company list. All 1,000 envelopes were `available`, with 0 integrity issues, 60,012 claims and 5,012 requests, in 228 s. An immediate re-run detected 0 changes. Two gaps showed up. Only 11% of companies register a website. NAV ads posted under a brand name were missed: 1 of 3 companies with active ads was found. This version's website step and organisation-number ad index address both. Details are in [`examples/smoke-1000-report.json`](examples/smoke-1000-report.json), with the sample in `examples/smoke-1000.txt`.
 
+**Live test of this version (22 October 2026, same 1,000 companies):**
+- **Registry research:** 1,000 of 1,000 envelopes `available`, 0 integrity issues, 183 s. An immediate re-run detected 0 changes and produced identical claim IDs.
+- **Hiring:** all 9,275 active NAV ads were read and indexed in about 4 minutes. The companies with active ads went from 1 to 3, and the attached ads from 1 to 5, including ads posted under brand names.
+- **Websites:** the check was run on real company sites:
+  - Five were verified: by organisation number, by the company name on the homepage, or by the full legal name in the footer.
+  - A "Coming Soon" placeholder and a group brand site (coop.no for a Coop entity) were correctly not published.
+  - The verified site that has profile links yielded its Facebook, Instagram and LinkedIn pages.
+- **Candidates in the sample:** 108 companies register a website. Another 113 can be checked through their registered email domain, and 880 through domains spelled from their name.
+
+Details are in [`examples/live-test-v3-report.json`](examples/live-test-v3-report.json).
+
 To smoke-test against the live registry on a random sample of real companies:
 
 ```bash
