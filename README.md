@@ -67,7 +67,7 @@ Optional flags and environment variables:
 - **Company-owned profiles:** LinkedIn, Facebook, Instagram, X, YouTube and TikTok pages that the verified website links to (or that the company registered as its website)
 - Contact points: registered company email and phone, plus email and phone links on the verified website's own domain (never published for sole proprietorships)
 - Group structure
-- **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units (including ads posted under a brand name). Also the verified website's careers page and the openings it lists: job-board ad links, its own job pages and structured `JobPosting` data.
+- **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units (including ads posted under a brand name). Also the verified website's careers page and the openings it lists: links to individual job-board ads and structured `JobPosting` data that has not expired.
 - **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated news items from the verified website's news page.
 
 ## Rules the agent follows
@@ -79,7 +79,7 @@ Optional flags and environment variables:
 - **Personal data minimisation.** Role holders' names are published (they are public register data). Birth dates are not. Job ad contact persons are never published, and contact details of sole proprietorships are left out.
 - **Hiring by organisation number.** Every active NAV ad's detail record is read once per run and indexed by the employer's organisation number, so an ad posted under a brand name is still found and a namesake employer never matches. If that read cannot finish in its time budget, the remaining ads are picked by employer name and still confirmed by organisation number.
 - **A website is a claim only after proof.** Candidate sites (registered website, registered email domain, domains spelled from the legal name) are only guesses. A site is published as the official website when it shows the company's organisation number, or when its homepage carries the full legal name and (for name-spelled domains) the site also shows the registered phone number or street address. Parked or for-sale pages are rejected. A site that lists several organisation numbers (a group site) is reported as `ambiguous`, and one that shows a different organisation number is rejected.
-- **News and openings only from a verified site.** A news item is published only with a date found in the item itself (or in its structured data). Openings come from links to job-board ads, the site's own job pages, or structured `JobPosting` data that has not expired. A careers-page link to a NAV ad that is already attached is not counted twice.
+- **News and openings only from a verified site.** A news item is published only with a date found in the item itself (or in its structured data). Openings come only from links to individual job-board ads or from structured `JobPosting` data that has not expired. Pages about working at the company are not counted as openings. A careers-page link to a NAV ad that is already attached is not counted twice.
 - **Profiles and contacts only from a verified site.** Social profiles are taken from the verified website's links and structured data, and only when the profile name matches the legal name or the site's own domain (a web agency's page is not the company's). Share buttons and personal profiles are ignored. Email and phone links are taken only on the site's own domain.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
@@ -160,7 +160,7 @@ The offline self-test (99 checks) runs against simulated registry, NAV and compa
 - job ads: namesake employers rejected, brand-name ads found by organisation number, inactive ads removed, NAV outage handled
 - websites: verified by organisation number or by name plus registered address; namesake, parked, group (ambiguous) and name-only sites not published; private addresses never contacted; robots.txt respected
 - profiles and contacts: share buttons, web-agency links and other-domain emails excluded; no false removals when a site is down or the web is unreachable
-- website news and careers pages: dated items only (from the item's own block), older items left out, expired and generic job links left out, NAV ads not counted twice
+- website news and careers pages: dated items only (from the item's own block), the news index preferred over a single article, older items left out, expired postings, generic links and pages about the employer left out, NAV ads not counted twice
 - summary: the at-a-glance line, including the revenue trend
 - input formats, unfamiliar column or key names, and malformed numbers
 
