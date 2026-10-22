@@ -13,6 +13,7 @@ import { BrregClient } from './agent/brreg.ts';
 import { validateOrgnr } from './agent/orgnr.ts';
 import { NavJobIndex } from './agent/jobs.ts';
 import { researchCompany, type RunContext } from './agent/profile.ts';
+import { WebClient } from './agent/web.ts';
 import type { Envelope } from './agent/types.ts';
 
 const ROOT = process.cwd();
@@ -22,25 +23,38 @@ const REPO_URL = 'https://github.com/RubyGoyal/signalpost-norwegian-company-agen
 
 const client = new BrregClient({ concurrency: 4, maxRequests: 100_000, timeoutMs: 20_000, maxRetries: 3 });
 // NAV job feed index, built at startup and refreshed hourly (SIGNALPOST_JOBS=off disables it).
+// A quick name-based index is ready first; the full index (every active ad read and matched by
+// employer organisation number) replaces it when its background read finishes.
 const JOBS_ON = (process.env.SIGNALPOST_JOBS || 'on') !== 'off';
-let jobsIndex: Promise<NavJobIndex> | null = null;
+const JOBS_DAYS = Number(process.env.SIGNALPOST_JOBS_DAYS || 60);
+const navClient = new BrregClient({ concurrency: 12, maxRequests: 1_000_000, timeoutMs: 30_000, maxRetries: 3 });
+let quickIndex: Promise<NavJobIndex> | null = null;
+let fullIndex: NavJobIndex | null = null;
 let jobsBuiltAt = 0;
 function getJobs(): Promise<NavJobIndex> | null {
   if (!JOBS_ON) return null;
-  if (!jobsIndex || Date.now() - jobsBuiltAt > 60 * 60 * 1000) {
+  if (!quickIndex || Date.now() - jobsBuiltAt > 60 * 60 * 1000) {
     jobsBuiltAt = Date.now();
-    jobsIndex = NavJobIndex.build(client, { days: Number(process.env.SIGNALPOST_JOBS_DAYS || 60), maxPages: 600 }).catch(() =>
-      NavJobIndex.failed('nav_job_index_error', 60)
-    );
+    const failed = () => NavJobIndex.failed('nav_job_index_error', JOBS_DAYS);
+    quickIndex = NavJobIndex.build(navClient, { days: JOBS_DAYS, maxPages: 600, detailScan: false }).catch(failed);
+    void NavJobIndex.build(navClient, { days: JOBS_DAYS, maxPages: 600, detailScan: true, detailBudgetMs: 600_000 })
+      .then((idx) => {
+        if (idx.info.ok) fullIndex = idx;
+      })
+      .catch(() => {});
   }
-  return jobsIndex;
+  return fullIndex ? Promise.resolve(fullIndex) : quickIndex;
 }
+
+// Company websites: verified per lookup through the public-URL guarded fetcher.
+const web = (process.env.SIGNALPOST_WEB || 'on') !== 'off' ? new WebClient({ concurrency: 8, timeoutMs: 8_000, maxBytes: 1_500_000, maxRedirects: 4, maxRequests: 1_000_000 }) : null;
 const ctx = async (): Promise<RunContext> => ({
   runId: `web-${new Date().toISOString().slice(0, 10)}`,
   client,
   stateDir: path.resolve(process.env.SIGNALPOST_STATE_DIR || '.signalpost-state'),
   maxLocationPages: 2,
   jobs: (await getJobs()) ?? undefined,
+  web,
 });
 
 // Batch results (from the last run) plus anything looked up live in the app.
@@ -195,6 +209,7 @@ async function startServer() {
         { name: 'Enhetsregisteret (entity, roles, sub-units, update feed)', url: 'https://data.brreg.no/enhetsregisteret/api/docs/index.html', licence: 'NLOD 2.0' },
         { name: 'Regnskapsregisteret (annual accounts)', url: 'https://data.brreg.no/regnskapsregisteret/regnskap/', licence: 'NLOD 2.0' },
         { name: 'NAV job vacancy feed (arbeidsplassen.no)', url: 'https://navikt.github.io/pam-stilling-feed/', licence: 'NAV API terms' },
+        { name: 'Company-owned websites (official website, linked profiles, contact links)', url: 'https://www.rfc-editor.org/rfc/rfc9309', licence: 'Public pages; robots.txt honoured' },
       ],
     });
   });

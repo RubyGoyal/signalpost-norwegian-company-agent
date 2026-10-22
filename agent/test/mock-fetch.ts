@@ -5,6 +5,9 @@
 //   MOCK_HANG=<orgnr>  → that company's registry call never answers (deadline test)
 //   MOCK_NAV_DOWN=1    → NAV job feed returns 503 (hiring source outage)
 //   MOCK_AD_INACTIVE=1 → company A's job ad has gone inactive (refresh removal test)
+//   MOCK_SITE_DOWN=1   → company A's website does not answer (no false removals test)
+//   MOCK_NO_WEB=1      → no DNS at all: the public web is unreachable (website step not run)
+// Company websites are served from the WEB table below, with a fake DNS (globalThis.__SIGNALPOST_DNS__).
 
 const A = '910000063'; // full profile
 const B = '910000098'; // sparse profile: no employees registered, no accounts, no website
@@ -13,6 +16,12 @@ const D = '910000322'; // unknown number (404)
 const E = '910000357'; // deleted (410)
 const G = '910000721'; // sole proprietorship (ENK) with contact details that must not be published
 const OTHER = '910000756'; // a namesake employer that is NOT company A
+const H = '910000802'; // email domain is a group site listing several companies → ambiguous
+const I = '910000810'; // registered website is a parked domain
+const J = '910000829'; // email domain resolves to a private address → never contacted
+const K = '910000837'; // registered website disallows robots → not read
+const L = '910000845'; // name-spelled domain shows only the name → not enough
+const M = '910000888'; // registered "website" is a Facebook page → a registered profile, not crawled
 
 const env: Record<string, string | undefined> = (globalThis as any).process?.env ?? {};
 const mutate = env.MOCK_MUTATE === '1';
@@ -20,6 +29,8 @@ const failRoles = env.MOCK_FAIL_ROLES === '1';
 const hang = env.MOCK_HANG;
 const navDown = env.MOCK_NAV_DOWN === '1';
 const adInactive = env.MOCK_AD_INACTIVE === '1';
+const siteDown = env.MOCK_SITE_DOWN === '1';
+const noWeb = env.MOCK_NO_WEB === '1';
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -29,7 +40,7 @@ const entities: Record<string, unknown> = {
     organisasjonsnummer: A,
     navn: 'TESTSELSKAP ALPHA AS',
     organisasjonsform: { kode: 'AS', beskrivelse: 'Aksjeselskap' },
-    hjemmeside: 'www.alpha-test.example',
+    hjemmeside: 'www.alpha-test.no',
     postadresse: { land: 'Norge', landkode: 'NO', postnummer: '0101', poststed: 'OSLO', adresse: ['Postboks 1'], kommune: 'OSLO', kommunenummer: '0301' },
     registreringsdatoEnhetsregisteret: '2012-03-01',
     registrertIMvaregisteret: true,
@@ -50,7 +61,7 @@ const entities: Record<string, unknown> = {
     historiskeNavn: [{ fraDato: '2012-03-01 10:00:00', navn: 'ALPHA TEST HOLDING AS', tilDato: '2019-06-30 09:00:00' }],
     erIKonsern: false,
     sisteInnsendteAarsregnskap: '2025',
-    epostadresse: 'post@alpha-test.example',
+    epostadresse: 'post@alpha-test.no',
     paategninger: [],
   },
   [G]: {
@@ -76,6 +87,28 @@ const entities: Record<string, unknown> = {
     underAvvikling: false,
     underTvangsavviklingEllerTvangsopplosning: false,
   },
+  ...Object.fromEntries(
+    ([
+      [H, 'TESTSELSKAP GAMMA AS', { epostadresse: 'post@gamma-group.no' }],
+      [I, 'TESTSELSKAP DELTA AS', { hjemmeside: 'www.delta-test.no' }],
+      [J, 'TESTSELSKAP EPSILON AS', { epostadresse: 'post@epsilon-test.no' }],
+      [K, 'TESTSELSKAP ZETA AS', { hjemmeside: 'www.zeta-test.no' }],
+      [L, 'TESTSELSKAP ETA AS', { epostadresse: 'post@eta-mail.no' }],
+      [M, 'TESTSELSKAP THETA AS', { hjemmeside: 'https://www.facebook.com/testselskaptheta' }],
+    ] as [string, string, Record<string, string>][]).map(([o, navn, extra]) => [
+      o,
+      {
+        organisasjonsnummer: o,
+        navn,
+        organisasjonsform: { kode: 'AS', beskrivelse: 'Aksjeselskap' },
+        forretningsadresse: { land: 'Norge', postnummer: '0150', poststed: 'OSLO', adresse: ['Annengata 9'], kommune: 'OSLO' },
+        konkurs: false,
+        underAvvikling: false,
+        underTvangsavviklingEllerTvangsopplosning: false,
+        ...extra,
+      },
+    ])
+  ),
 };
 
 const roles: Record<string, unknown> = {
@@ -173,6 +206,7 @@ const ad = (uuid: string, status: string, businessName: string, modified: string
 const U1 = '11111111-1111-4111-8111-111111111111';
 const U2 = '22222222-2222-4222-8222-222222222222';
 const U3 = '33333333-3333-4333-8333-333333333333';
+const U4 = '44444444-4444-4444-8444-444444444444'; // posted under a brand name, employer = A's sub-unit
 const feedPages: Record<string, unknown> = {
   '/api/v1/feed': {
     items: [
@@ -186,6 +220,7 @@ const feedPages: Record<string, unknown> = {
     items: [
       ad(U2, 'ACTIVE', 'Testselskap Alpha', '2026-10-12T10:00:00+02:00'),
       ad(U3, 'INACTIVE', 'TESTSELSKAP ALPHA AS', '2026-10-13T10:00:00+02:00'),
+      ad(U4, 'ACTIVE', 'Alpha Kantine Bergen', '2026-10-09T10:00:00+02:00'),
     ],
     next_url: null,
     next_id: null,
@@ -212,6 +247,16 @@ const adDetails: Record<string, unknown> = {
     status: 'ACTIVE',
     ad_content: { title: 'Selger', published: '2026-10-12T09:00:00+02:00', expires: '2099-12-31T00:00:00+01:00', employer: { name: 'TESTSELSKAP ALPHA', orgnr: OTHER } },
   },
+  [U4]: {
+    uuid: U4,
+    status: 'ACTIVE',
+    ad_content: {
+      title: 'Kokk',
+      published: '2026-10-01T09:00:00+02:00',
+      expires: '2099-12-31T00:00:00+01:00',
+      employer: { name: 'Alpha Kantine Bergen', orgnr: '910000462' },
+    },
+  },
   [U3]: {
     uuid: U3,
     status: 'INACTIVE',
@@ -219,9 +264,97 @@ const adDetails: Record<string, unknown> = {
   },
 };
 
+
+// ---------------------------------------------------------------------------
+// Company websites (fictitious) and a fake DNS
+// ---------------------------------------------------------------------------
+const PUBLIC_IP = '185.70.10.1';
+const DNS: Record<string, string> = {
+  'www.brreg.no': PUBLIC_IP,
+  'alpha-test.no': PUBLIC_IP,
+  'www.alpha-test.no': PUBLIC_IP,
+  'testselskapbeta.no': PUBLIC_IP,
+  'testselskap-beta.no': PUBLIC_IP,
+  'gamma-group.no': PUBLIC_IP,
+  'delta-test.no': PUBLIC_IP,
+  'www.delta-test.no': PUBLIC_IP,
+  'epsilon-test.no': '10.0.0.5',
+  'www.epsilon-test.no': '10.0.0.5',
+  'zeta-test.no': PUBLIC_IP,
+  'www.zeta-test.no': PUBLIC_IP,
+  'testselskapeta.no': PUBLIC_IP,
+  'eta-mail.no': PUBLIC_IP,
+  'www.eta-mail.no': PUBLIC_IP,
+};
+(globalThis as any).__SIGNALPOST_DNS__ = async (host: string) => {
+  if (noWeb || !DNS[host]) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
+  return [DNS[host]];
+};
+const page = (title: string, body: string, head = '') =>
+  `<!doctype html><html lang="no"><head><meta charset="utf-8"><title>${title}</title>${head}</head><body>${body}</body></html>`;
+type Site = { robots?: string; pages: Record<string, string | { redirect: string }> };
+const WEB: Record<string, Site> = {
+  'www.brreg.no': { robots: 'User-agent: *\nAllow: /\n', pages: {} },
+  'www.alpha-test.no': {
+    robots: 'User-agent: *\nDisallow: /admin\n',
+    pages: {
+      '/': page(
+        'Testselskap Alpha &ndash; programvare',
+        `<nav><a href="/kontakt">Kontakt oss</a> <a href="https://www.facebook.com/sharer/sharer.php?u=x">Del</a></nav>
+         <p>Vi lager programvare for norske bedrifter.</p>
+         <footer>Testselskap Alpha AS &middot; Org.nr 910&nbsp;000&nbsp;063 MVA &middot;
+         <a href="mailto:salg@alpha-test.no">salg@alpha-test.no</a> <a href="mailto:post@alpha-test.no">post</a>
+         <a href="tel:+4722334455">22 33 44 55</a>
+         <a href="https://www.facebook.com/testselskapalpha">Facebook</a>
+         <a href="https://www.instagram.com/webbyraa/">Laget av Webbyr&aring;</a> <a href="mailto:hei@webbyraa.no">byr&aring;</a></footer>`,
+        '<meta property="og:site_name" content="Alpha Test"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Testselskap Alpha AS","sameAs":["https://www.linkedin.com/company/alpha-test/"]}</script>'
+      ),
+    },
+  },
+  'alpha-test.no': { pages: { '/': { redirect: 'https://www.alpha-test.no/' } } },
+  'testselskapbeta.no': {
+    pages: { '/': page('Testselskap Beta Utleie', '<p>Utleie av lokaler.</p><footer>Org.nr: 910 000 756</footer>') },
+  },
+  'testselskap-beta.no': {
+    pages: {
+      '/': page('Testselskap Beta AS | Bergen', '<p>Vi leier ut næringslokaler i Bergen sentrum. Ta kontakt for visning.</p><footer>Prøvevegen 2, 5003 Bergen</footer>'),
+    },
+  },
+  'gamma-group.no': {
+    pages: {
+      '/': page(
+        'Gamma Group',
+        '<p>Selskaper i gruppen:</p><ul><li>Testselskap Gamma AS, org.nr 910 000 802</li><li>Gamma Eiendom AS, org.nr 910 000 853</li><li>Gamma Drift AS, org.nr 910 000 861</li></ul>'
+      ),
+    },
+  },
+  'www.delta-test.no': { pages: { '/': page('delta-test.no', '<h1>Dette domenet er til salgs</h1><p>Kontakt megler.</p>') } },
+  'epsilon-test.no': { pages: { '/': page('Testselskap Epsilon AS', '<footer>Org.nr 910 000 829</footer>') } },
+  'www.zeta-test.no': {
+    robots: 'User-agent: *\nDisallow: /\n',
+    pages: { '/': page('Testselskap Zeta AS', '<footer>Org.nr 910 000 837 <a href="https://facebook.com/testselskapzeta">fb</a></footer>') },
+  },
+  'testselskapeta.no': { pages: { '/': page('Testselskap Eta', '<p>Velkommen til Testselskap Eta. Vi tilbyr gode tjenester til våre kunder over hele landet.</p>') } },
+};
+const html = (body: string) => new Response(body, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+function webResponse(url: URL): Response {
+  const host = url.hostname;
+  if (siteDown && host.endsWith('alpha-test.no')) throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  // A mail-only domain: it resolves, but no web server answers.
+  if (host.endsWith('eta-mail.no')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+  const site = WEB[host];
+  if (!site) throw new TypeError('fetch failed');
+  if (url.pathname === '/robots.txt') return site.robots ? new Response(site.robots, { status: 200, headers: { 'content-type': 'text/plain' } }) : new Response('not found', { status: 404 });
+  const p = site.pages[url.pathname];
+  if (!p) return new Response('<h1>404</h1>', { status: 404, headers: { 'content-type': 'text/html' } });
+  if (typeof p !== 'string') return new Response(null, { status: 301, headers: { location: p.redirect } });
+  return html(p);
+}
+
 globalThis.fetch = (async (input: any, init?: any) => {
   const url = new URL(typeof input === 'string' ? input : input.url);
   const p = url.pathname;
+  if (url.hostname !== 'data.brreg.no' && url.hostname !== 'pam-stilling-feed.nav.no') return webResponse(url);
   if (url.hostname === 'pam-stilling-feed.nav.no') {
     if (navDown) return json(503, { error: 'unavailable' });
     if (p === '/api/publicToken') return new Response('Current public token for Nav Job Vacancy Feed: eyJhbGciOiJIUzI1NiJ9.eyJ0ZXN0Ijp0cnVlfQ.c2lnbmF0dXJl', { status: 200 });

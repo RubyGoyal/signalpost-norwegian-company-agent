@@ -49,6 +49,7 @@ const FAMILY_LABELS: Record<FieldFamily, string> = {
   locations: 'Locations',
   annual_accounts: 'Annual accounts',
   official_website: 'Website',
+  company_profiles: 'Company-owned profiles',
   contact_points: 'Contact points',
   group_structure: 'Group structure',
   job_postings: 'Hiring (NAV job ads)',
@@ -96,9 +97,10 @@ const FIELD_LABELS: Record<string, string> = {
   latest_filed_accounts_year: 'Latest filed accounts year',
   is_group_member: 'Part of a group',
   registry_notice: 'Registry notice',
-  email: 'Email (registered)',
-  phone: 'Phone (registered)',
-  mobile: 'Mobile (registered)',
+  email: 'Email',
+  phone: 'Phone',
+  mobile: 'Mobile',
+  social_profile: 'Profile',
   job_ad: 'Job ad',
   registry_event: 'Registry event',
 };
@@ -111,6 +113,7 @@ const SOURCE_LABELS: Record<string, string> = {
   oppdateringer: 'Registry update feed',
   nav_job_feed: 'NAV job feed',
   nav_job_ad: 'NAV job ad',
+  company_website: 'Company website',
 };
 
 const REASON_TEXT: Record<string, string> = {
@@ -128,6 +131,19 @@ const REASON_TEXT: Record<string, string> = {
   no_contact_details_registered: 'Checked: none registered',
   no_registry_events_since_2025: 'Checked: no events since 2025',
   jobs_source_disabled: 'Not checked in this run',
+  registered_in_enhetsregisteret: 'As registered',
+  registered_and_verified_on_site: 'Registered and verified on the site',
+  verified_on_site_via_registered_email_domain: 'Found via registered email, verified on the site',
+  verified_on_site_via_name_domain_check: 'Found from the company name, verified on the site',
+  no_verified_website_found: 'Checked: none registered or verified',
+  registered_website_parked: 'Registered domain is parked',
+  site_shows_several_organisation_numbers: 'Ambiguous: site lists several companies',
+  website_check_incomplete: 'Website could not be checked this run',
+  website_check_not_run: 'Website not checked in this run',
+  robots_txt_disallows: 'Site does not allow automated access',
+  linked_from_verified_website: 'Linked from its verified website',
+  no_profiles_linked_from_verified_website: 'Checked: none linked from its website',
+  no_verified_website: 'No verified website to read from',
 };
 
 const fmtNum = (n: number) => n.toLocaleString('en-US');
@@ -151,7 +167,13 @@ function formatValue(c: Claim): ReactNode {
   if (c.field === 'website')
     return (
       <a href={v.url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2 break-all">
-        {v.as_registered}
+        {v.as_registered || v.url}
+      </a>
+    );
+  if (c.field === 'social_profile')
+    return (
+      <a href={v.url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2 break-all">
+        {({ linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', youtube: 'YouTube', tiktok: 'TikTok' } as Record<string, string>)[v.platform] || v.platform}: {v.url.replace(/^https:\/\//, '')}
       </a>
     );
   if (c.field === 'role')
@@ -828,6 +850,7 @@ function AboutView() {
         <ol className="list-decimal pl-5 space-y-2 text-sm text-slate-800">
           <li>Takes a Norwegian organisation number and checks its modulus-11 check digit.</li>
           <li>Reads the official Brønnøysund registers for that exact number: the entity register, roles, sub-units, filed annual accounts and the registry's dated change log. Checks NAV's job feed for active job ads.</li>
+          <li>Finds the company's official website (registered website, registered email domain, or a domain spelled from its name) and publishes it only when the site proves it is the same company: its organisation number on the site, or its exact name plus the registered phone number or address.</li>
           <li>Publishes only values the registers hold. Each fact links to the source, with retrieval time and, for accounts, the reporting period.</li>
           <li>On a re-check, compares with the previous snapshot and lists real changes only, keeping the earlier evidence.</li>
         </ol>
@@ -835,6 +858,8 @@ function AboutView() {
       <Card title="Rules it follows">
         <ul className="list-disc pl-5 space-y-2 text-sm text-slate-800">
           <li>Every fact is matched by exact organisation number, so it cannot belong to a different company.</li>
+          <li>Social profiles and contact details are taken only from the verified website, and only when the profile name matches the company or its website.</li>
+          <li>Company websites are read politely: robots.txt is respected, at most a few pages per site, and private or local network addresses are never contacted.</li>
           <li>If a register cannot be reached, the result says so (“failed”) and shows nothing for it. Nothing is guessed or filled in.</li>
           <li>Missing values are never shown as zero.</li>
           <li>Birth dates of board members and managers are not published.</li>

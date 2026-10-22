@@ -1,10 +1,13 @@
 // Hiring signal from NAV's public job vacancy feed (pam-stilling-feed.nav.no).
 //
 // The feed is read once per run: every entry modified in the last N days, keeping the
-// latest state of each ad. An ad is attached to a company only after its detail record
-// confirms that the employer organisation number is the company itself or one of its
-// registered sub-units. Name matching only selects candidates; it is never evidence.
-// Only ACTIVE, unexpired ads are published, and contact persons are never published.
+// latest state of each ad. Then the detail record of every active ad is read once, and the
+// ads are indexed by the employer's organisation number. A company gets an ad only when that
+// number is the company itself or one of its registered sub-units, so ads posted under a
+// brand name are found too, and a namesake employer never matches. If the detail read could
+// not finish in its time budget, the remaining ads fall back to name-selected candidates,
+// still confirmed by organisation number. Only ACTIVE, unexpired ads are published, and
+// contact persons are never published.
 
 import type { BrregClient, FetchResult } from './brreg.ts';
 import type { SourceSnapshot } from './types.ts';
@@ -50,6 +53,20 @@ export interface JobIndexInfo {
   window_to: string | null;
   retrieved_at: string;
   first_page_url: string;
+  /** Detail records of active ads read and indexed by employer organisation number. */
+  details_scanned?: number;
+  details_total?: number;
+  detail_scan_complete?: boolean;
+  detail_errors?: number;
+  detail_seconds?: number;
+}
+
+interface AdDetail {
+  uuid: string;
+  orgnr: string;
+  status: string;
+  json: any;
+  snapshot: SourceSnapshot;
 }
 
 // Written with string escapes so the source stays plain ASCII.
@@ -70,6 +87,8 @@ export function normName(s: string): string {
 
 export class NavJobIndex {
   private byName = new Map<string, FeedAd[]>();
+  private byOrgnr = new Map<string, AdDetail[]>();
+  private scanned = new Set<string>();
   info: JobIndexInfo;
   private token: string | null = null;
 
@@ -105,8 +124,19 @@ export class NavJobIndex {
 
   static async build(
     client: BrregClient,
-    opts: { days: number; maxPages: number; count?: (n: number) => void }
+    opts: {
+      days: number;
+      maxPages: number;
+      count?: (n: number) => void;
+      /** Read every active ad's detail record and index it by employer organisation number. */
+      detailScan?: boolean;
+      /** Time budget for the detail read; what is left falls back to name-selected candidates. */
+      detailBudgetMs?: number;
+      /** Hard time budget for the feed read itself. */
+      feedBudgetMs?: number;
+    }
   ): Promise<NavJobIndex> {
+    const tFeed = Date.now();
     const count = opts.count || (() => {});
     const from = new Date(Date.now() - opts.days * 864e5);
     const idx = new NavJobIndex({
@@ -135,6 +165,10 @@ export class NavJobIndex {
     let first = true;
     let tokenRefreshed = false;
     while (url && idx.info.feed_pages < opts.maxPages) {
+      if (opts.feedBudgetMs && Date.now() - tFeed > opts.feedBudgetMs) {
+        idx.info.error = 'nav_feed_time_budget_reached';
+        break;
+      }
       const headers: Record<string, string> = { Authorization: `Bearer ${idx.token}` };
       if (first) headers['If-Modified-Since'] = from.toUTCString();
       let r: FetchResult = await client.fetchUrl('nav_job_feed', url, `snap:nav:feed:${idx.info.feed_pages}`, count, { headers });
@@ -183,7 +217,42 @@ export class NavJobIndex {
     // A capped read would miss the newest ads, so it counts as a failed index, not a partial one.
     if (url && !idx.info.error) idx.info.error = 'nav_feed_page_cap_reached';
     idx.info.ok = idx.info.feed_pages > 0 && !idx.info.error;
+    if (idx.info.ok && opts.detailScan !== false) await idx.scanDetails(client, count, opts.detailBudgetMs ?? 300_000);
     return idx;
+  }
+
+  /** Reads the detail record of every active ad once and indexes it by employer organisation number. */
+  private async scanDetails(client: BrregClient, count: (n: number) => void, budgetMs: number) {
+    const t0 = Date.now();
+    const todo = [...this.byName.values()].flat();
+    this.info.details_total = todo.length;
+    this.info.details_scanned = 0;
+    this.info.detail_errors = 0;
+    let next = 0;
+    const workers = Array.from({ length: 24 }, async () => {
+      while (next < todo.length && Date.now() - t0 < budgetMs) {
+        const ad = todo[next++];
+        const r = await client.fetchUrl('nav_job_ad', ad.detailUrl, `snap:nav:ad:${ad.uuid}`, count, {
+          headers: { Authorization: `Bearer ${this.token}` },
+        });
+        if (r.outcome !== 'ok') {
+          this.info.detail_errors!++;
+          continue;
+        }
+        const d = r.json || {};
+        const j = d.ad_content || d.json || {};
+        const orgnr = String(j?.employer?.orgnr || '').replace(/\s/g, '');
+        this.scanned.add(ad.uuid);
+        this.info.details_scanned!++;
+        if (!/^\d{9}$/.test(orgnr)) continue;
+        const list = this.byOrgnr.get(orgnr) || [];
+        list.push({ uuid: ad.uuid, orgnr, status: String(d.status || 'ACTIVE'), json: j, snapshot: r.snapshot });
+        this.byOrgnr.set(orgnr, list);
+      }
+    });
+    await Promise.all(workers);
+    this.info.detail_scan_complete = this.scanned.size === todo.length;
+    this.info.detail_seconds = Math.round((Date.now() - t0) / 1000);
   }
 
   candidates(names: string[]): FeedAd[] {
@@ -207,10 +276,39 @@ export class NavJobIndex {
     maxDetails: number,
     count: (n: number) => void
   ): Promise<{ ads: ConfirmedAd[]; checked: number; capped: boolean; errors: number }> {
-    const cands = this.candidates(names);
     const ads: ConfirmedAd[] = [];
     let errors = 0;
     const now = Date.now();
+    const toAd = (uuid: string, d: any, j: any, orgnr: string, via: 'company' | 'sub_unit', municipal: string | null, title: string, snapshot: SourceSnapshot): ConfirmedAd | null => {
+      if (String(d.status || 'ACTIVE') !== 'ACTIVE') return null;
+      if (j.expires && Date.parse(j.expires) < now) return null;
+      const loc = Array.isArray(j.workLocations) && j.workLocations[0];
+      return {
+        uuid,
+        title: String(j.title || title),
+        employer_name: j?.employer?.name ? String(j.employer.name) : null,
+        employer_orgnr: orgnr,
+        matched_via: via,
+        location: loc ? [loc.city, loc.municipal, loc.county].filter(Boolean)[0] || null : municipal,
+        published: j.published ? String(j.published).slice(0, 10) : null,
+        expires: j.expires ? String(j.expires).slice(0, 10) : null,
+        application_due: j.applicationDue ? String(j.applicationDue) : null,
+        positions: Number.isFinite(Number(j.positioncount)) && j.positioncount !== null && j.positioncount !== undefined ? Number(j.positioncount) : null,
+        extent: j.extent ? String(j.extent) : null,
+        engagement_type: j.engagementtype ? String(j.engagementtype) : null,
+        nav_url: `https://arbeidsplassen.nav.no/stillinger/stilling/${uuid}`,
+        snapshot,
+      };
+    };
+    // 1. Ads already read and indexed by employer organisation number (no extra requests).
+    for (const [orgnr, via] of orgnrs) {
+      for (const d of this.byOrgnr.get(orgnr) || []) {
+        const ad = toAd(d.uuid, { status: d.status }, d.json, orgnr, via, null, '', d.snapshot);
+        if (ad) ads.push(ad);
+      }
+    }
+    // 2. Ads the detail read did not reach: name-selected candidates, confirmed by number.
+    const cands = this.candidates(names).filter((c) => !this.scanned.has(c.uuid));
     const slice = cands.slice(0, maxDetails);
     await Promise.all(
       slice.map(async (c) => {
@@ -226,25 +324,8 @@ export class NavJobIndex {
         const orgnr = String(j?.employer?.orgnr || '').replace(/\s/g, '');
         const via = orgnrs.get(orgnr);
         if (!via) return; // name matched, organisation number did not: not this company
-        if (String(d.status || 'ACTIVE') !== 'ACTIVE') return;
-        if (j.expires && Date.parse(j.expires) < now) return;
-        const loc = Array.isArray(j.workLocations) && j.workLocations[0];
-        ads.push({
-          uuid: c.uuid,
-          title: String(j.title || c.title),
-          employer_name: j?.employer?.name ? String(j.employer.name) : null,
-          employer_orgnr: orgnr,
-          matched_via: via,
-          location: loc ? [loc.city, loc.municipal, loc.county].filter(Boolean)[0] || null : c.municipal,
-          published: j.published ? String(j.published).slice(0, 10) : null,
-          expires: j.expires ? String(j.expires).slice(0, 10) : null,
-          application_due: j.applicationDue ? String(j.applicationDue) : null,
-          positions: Number.isFinite(Number(j.positioncount)) && j.positioncount !== null ? Number(j.positioncount) : null,
-          extent: j.extent ? String(j.extent) : null,
-          engagement_type: j.engagementtype ? String(j.engagementtype) : null,
-          nav_url: `https://arbeidsplassen.nav.no/stillinger/stilling/${c.uuid}`,
-          snapshot: r.snapshot,
-        });
+        const ad = toAd(c.uuid, d, j, orgnr, via, c.municipal, c.title, r.snapshot);
+        if (ad) ads.push(ad);
       })
     );
     ads.sort((a, b) => ((a.published || '') < (b.published || '') ? 1 : -1));

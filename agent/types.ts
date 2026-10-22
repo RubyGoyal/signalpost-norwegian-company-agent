@@ -18,6 +18,7 @@ export const FIELD_FAMILIES = [
   'locations',
   'annual_accounts',
   'official_website',
+  'company_profiles',
   'contact_points',
   'group_structure',
   'job_postings',
@@ -33,9 +34,10 @@ export type SourceName =
   | 'regnskapsregisteret'
   | 'oppdateringer'
   | 'nav_job_feed'
-  | 'nav_job_ad';
+  | 'nav_job_ad'
+  | 'company_website';
 
-export type SourceClass = 'official_registry' | 'official_job_board';
+export type SourceClass = 'official_registry' | 'official_job_board' | 'company_owned';
 
 export interface SourceSnapshot {
   id: string;
@@ -63,7 +65,8 @@ export interface Evidence {
   source_class: SourceClass;
   retrieved_at: string;
   content_sha256: string | null;
-  /** JSON path inside the source response that holds the value. */
+  /** Where the value sits in the source: a JSON path for registry/NAV responses, or the
+   *  exact text (or link) on a company web page. */
   claim_span: string;
   reporting_period: ReportingPeriod | null;
 }
@@ -133,6 +136,8 @@ export interface Envelope {
     statements: SummaryStatement[];
     unknowns: string[];
   };
+  /** Material changes since the previous run (same list as refresh.changes). */
+  changes: Change[];
   refresh: {
     baseline: 'cold_start' | 'previous_run';
     previous_run_id: string | null;

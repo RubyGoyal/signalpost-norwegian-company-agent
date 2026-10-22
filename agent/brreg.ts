@@ -1,5 +1,6 @@
-// HTTP client for the agent's permitted sources: the open Brønnøysundregistrene APIs
+// HTTP client for the agent's fixed API sources: the open Brønnøysundregistrene APIs
 // (data.brreg.no, NLOD 2.0) and NAV's job vacancy feed (pam-stilling-feed.nav.no).
+// (Company websites go through agent/web.ts, which has its own public-URL guard.)
 // Concurrency-limited, retries 429/5xx/network errors with backoff, counts every
 // outbound request, refuses any other host, and records a source snapshot per response.
 
@@ -28,6 +29,12 @@ const SOURCE_META: Record<SourceName, { source_class: SourceClass; publisher: st
     source_class: 'official_job_board',
     publisher: 'NAV (Arbeids- og velferdsetaten), arbeidsplassen.no',
     licence: 'NAV job feed API terms (https://arbeidsplassen.nav.no/vilkar-api)',
+  },
+  // Company websites are fetched by agent/web.ts, never by this client (not in ALLOWED_HOSTS).
+  company_website: {
+    source_class: 'company_owned',
+    publisher: 'The company (its own website)',
+    licence: 'Company-owned public web page, read once per run; robots.txt honoured',
   },
 };
 

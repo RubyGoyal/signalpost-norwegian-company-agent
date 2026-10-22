@@ -1,6 +1,6 @@
 # Signalpost — Norwegian company profiles with evidence
 
-Signalpost takes Norwegian organisation numbers and returns one result envelope per company. Each envelope holds the facts that the official Brønnøysund registers hold for that exact organisation number. Every fact carries its source URL, the JSON field it came from, the retrieval time, and the reporting period where one applies.
+Signalpost takes Norwegian organisation numbers and returns one result envelope per company. Each envelope holds the facts that the official Brønnøysund registers hold for that exact organisation number, the company's verified official website and the profiles it links to, and its active job ads on NAV. Every fact carries its source URL, where in the source it was found, the retrieval time, and the reporting period where one applies.
 
 Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/signalpost).
 
@@ -29,12 +29,15 @@ Optional flags and environment variables:
 | Flag | Env var | Default | Purpose |
 |---|---|---|---|
 | `--concurrency` | `SIGNALPOST_CONCURRENCY` | 8 | Parallel registry requests |
-| `--max-requests` | `SIGNALPOST_MAX_REQUESTS` | 20000 | Hard cap on outbound requests per run |
+| `--max-requests` | `SIGNALPOST_MAX_REQUESTS` | 20000 | Hard cap on registry requests per run (NAV and websites have their own caps) |
 | `--deadline-seconds` | `SIGNALPOST_DEADLINE_SECONDS` | off | At this time, unfinished companies are written as `failed`, so no row is ever missing |
 | `--state-dir` | `SIGNALPOST_STATE_DIR` | `.signalpost-state` | Previous snapshots used for refresh |
 | `--run-id` | `SIGNALPOST_RUN_ID` | timestamp | Run identifier written into every envelope |
 | `--jobs` | `SIGNALPOST_JOBS` | on | `off` skips the NAV job feed |
 | `--jobs-days` | `SIGNALPOST_JOBS_DAYS` | 60 | How many days of NAV job feed to read |
+| `--web` | `SIGNALPOST_WEB` | on | `off` skips the company-website step (reported as not checked) |
+| | `SIGNALPOST_WEBSITE_BUDGET_MS` | 20000 | Time budget for one company's website step |
+| | `SIGNALPOST_JOBS_DETAIL_BUDGET_MS` | 300000 | Time budget for reading every active NAV ad |
 
 ## What each envelope contains
 
@@ -44,10 +47,11 @@ Optional flags and environment variables:
 | `legal_identity` | Legal name, organisation form and registry status, matched on the exact organisation number |
 | `availability` | State and reason per field family (see below). A source that was checked and returned nothing is distinguished from one that was not checked. |
 | `claims` | One per fact: `field`, `value`, `unit`, `reporting_period`, `source_date`, `retrieved_at`, `evidence_ids` |
-| `evidence` | Source URL, JSON path (`claim_span`), retrieval time, SHA-256 of the source response, reporting period |
-| `source_snapshots` | Every registry request: URL, HTTP status, retrieval time, content hash, licence |
+| `evidence` | Source URL, source class (`official_registry`, `official_job_board` or `company_owned`), `claim_span` (the JSON path in a register response, or the exact text or link on a company web page), retrieval time, SHA-256 of the source response, reporting period |
+| `source_snapshots` | Every request: URL, HTTP status, retrieval time, content hash, licence |
 | `summary` | What the company does, its size, people, locations, status, what changed and what is unknown. Each statement links to its evidence. |
-| `refresh` | `cold_start` or `previous_run`, plus changes (`new_value`, `changed_value`, `removed_value`) with before and after values and the previous evidence |
+| `changes` | Material changes since the previous run (`new_value`, `changed_value`, `removed_value`) with before and after values and the previous evidence |
+| `refresh` | `cold_start` or `previous_run`, the previous run ID and date, the same change list, and the number of unchanged claims |
 | `run`, `operations`, `errors` | Run ID and timing, requests used, third-party cost ($0), and any source errors |
 
 **Field families covered:**
@@ -59,20 +63,23 @@ Optional flags and environment variables:
 - Roles: CEO, board, auditor, accountant and others
 - Locations: active sub-units with address and employees
 - Annual accounts: revenue, operating profit, profit before tax, annual result, assets, equity, liabilities, audited flag, latest filed year
-- Official website (as registered)
-- Contact points: registered company email and phone (never published for sole proprietorships)
+- **Official website:** the website registered in Enhetsregisteret, or one found through the registered email domain or a domain spelled from the legal name, published only after the site proves it is the same company (see rules)
+- **Company-owned profiles:** LinkedIn, Facebook, Instagram, X, YouTube and TikTok pages that the verified website links to (or that the company registered as its website)
+- Contact points: registered company email and phone, plus email and phone links on the verified website's own domain (never published for sole proprietorships)
 - Group structure
-- **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached only when the ad's employer organisation number is the company or one of its registered sub-units
+- **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units, including ads posted under a brand name
 - **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed"
 
 ## Rules the agent follows
 
-- **Exact identity.** Every Brønnøysund register is queried by the exact organisation number, after a modulus-11 check, so facts cannot attach to a namesake, parent or subsidiary. NAV job ads are attached only after the ad's own employer organisation number is confirmed (see below).
+- **Exact identity.** Every Brønnøysund register is queried by the exact organisation number, after a modulus-11 check, so facts cannot attach to a namesake, parent or subsidiary. NAV job ads and websites are attached only after their own evidence confirms the organisation number or the exact company (see below).
 - **No invented values.** A value is published only if the register holds it. If a register cannot be reached after retries, that family is `failed` and has no claims. If the identity lookup fails, the company is `failed` with zero claims.
 - **Missing is not zero.** An employee count is published only when the register says one is registered. Accounts figures are published only when present in the filing, and always with their reporting period.
-- **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage never shows up as removed facts.
+- **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage, an unreachable website or a skipped step never shows up as removed facts.
 - **Personal data minimisation.** Role holders' names are published (they are public register data). Birth dates are not. Job ad contact persons are never published, and contact details of sole proprietorships are left out.
-- **Name matching is never evidence.** Job ads are found by employer name only to pick candidates; each one is attached only after its detail record confirms the employer organisation number. A namesake employer is rejected.
+- **Hiring by organisation number.** Every active NAV ad's detail record is read once per run and indexed by the employer's organisation number, so an ad posted under a brand name is still found and a namesake employer never matches. If that read cannot finish in its time budget, the remaining ads are picked by employer name and still confirmed by organisation number.
+- **A website is a claim only after proof.** Candidate sites (registered website, registered email domain, domains spelled from the legal name) are only guesses. A site is published as the official website when it shows the company's organisation number, or when its homepage carries the full legal name and (for name-spelled domains) the site also shows the registered phone number or street address. Parked or for-sale pages are rejected. A site that lists several organisation numbers (a group site) is reported as `ambiguous`, and one that shows a different organisation number is rejected.
+- **Profiles and contacts only from a verified site.** Social profiles are taken from the verified website's links and structured data, and only when the profile name matches the legal name or the site's own domain (a web agency's page is not the company's). Share buttons and personal profiles are ignored. Email and phone links are taken only on the site's own domain.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
 ## Sources, rights and outbound policy
@@ -85,17 +92,27 @@ Optional flags and environment variables:
 | Regnskapsregisteret (accounts) | `https://data.brreg.no/regnskapsregisteret/regnskap/{orgnr}` | NLOD 2.0 |
 | Enhetsregisteret (change log) | `https://data.brreg.no/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer={orgnr}` | NLOD 2.0 |
 | NAV job vacancy feed | `https://pam-stilling-feed.nav.no/api/v1/feed` and `/api/v1/feedentry/{uuid}` | [NAV API terms](https://arbeidsplassen.nav.no/vilkar-api): ads may be republished; inactive ads must be removed |
+| Company-owned websites | The company's own homepage plus at most two contact or about pages | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
 
-- The agent makes outbound requests only to `data.brreg.no` and `pam-stilling-feed.nav.no`. Any other host, non-HTTPS URL or redirect off those hosts is refused in code (`ALLOWED_HOSTS` in `agent/brreg.ts`). It identifies itself with a `User-Agent` that links to this repository.
-- Requests are rate-limited (default 8 concurrent) with retries and backoff on 429 and 5xx responses.
-- Each company needs 5–7 requests: entity, roles, accounts, sub-units, change log, plus one NAV detail request per candidate job ad (capped at 15).
-- The NAV job feed is read once per run: every entry modified in the last 60 days (about 120 pages, about 2 minutes), time-boxed so a slow feed cannot stall the run. `SIGNALPOST_JOBS=off` skips it, and job postings are then reported as not checked.
+**Registers and NAV.** Requests to these APIs go only to `data.brreg.no` and `pam-stilling-feed.nav.no`, over HTTPS. Any other host or a redirect off those hosts is refused in code (`ALLOWED_HOSTS` in `agent/brreg.ts`). Registry requests are rate-limited (default 8 concurrent) with retries and backoff on 429 and 5xx responses. Each company needs 5 or 6 registry requests: entity, roles, accounts, sub-units and change log.
+
+**NAV job feed.** Read once per run, in the background while companies are researched: every entry modified in the last 60 days (about 120 pages), then the detail record of every active ad (about 9,000, by a separate client at 12 concurrent requests). Both steps are time-boxed. If the index is not ready, job postings are reported as `failed`, never guessed. `SIGNALPOST_JOBS=off` skips it, and job postings are then reported as not checked.
+
+**Company websites: safe URL handling** (`agent/web.ts`). Because these hosts are not known in advance, every request passes a public-URL guard:
+- Only `http` and `https`, default ports, and no credentials in the URL.
+- The host must resolve, and every address must be public. Loopback, private, link-local (including cloud metadata addresses), carrier-grade NAT, multicast and reserved ranges are refused. This is checked again on every redirect hop (at most 4).
+- `robots.txt` is honoured. A missing file allows access; one that cannot be fetched counts as a full disallow.
+- Only HTML is read, at most 1.5 MB per page and 8 seconds per request. A company gets at most a few pages and 20 seconds in total.
+- Social platforms and directory sites are never crawled.
+- A start-of-run probe and a circuit breaker turn the step off if the public web is unreachable. It is then reported as not checked, never as "no website".
+- Requests identify the agent with a `User-Agent` that links to this repository.
 
 ## Models, APIs, cost and secrets
 
 - **Models:** none. No LLM or paid API is used; all sources are free public APIs.
 - **Third-party cost per official run:** $0.
 - **Caches:** no external cache. The only stored data is the local `.signalpost-state/` folder with each company's previous snapshot, used to detect changes on refresh. Delete it for a cold start.
+- **Expected runtime:** about 5 to 7 minutes for 1,000 companies. Registry research and the website step run in parallel with the NAV read. `--deadline-seconds` guarantees a complete file within any budget.
 - **Secrets:** none required. NAV's job feed uses its published public token, fetched at run time from `https://pam-stilling-feed.nav.no/api/publicToken`; a NAV-issued token can be supplied instead with `SIGNALPOST_NAV_TOKEN`. No keys are stored or logged. `.env*` files are git-ignored.
 - **Dependencies:** pinned in `package-lock.json`, installed with `npm ci`. Runtime: `tsx` (MIT). Web app: `express`, `react`, `vite`, `tailwindcss`, `lucide-react` (MIT / ISC).
 
@@ -112,6 +129,8 @@ npm run check:signalpost-challenge    # live run on 10 well-known companies (exa
 
 **v2 live smoke test (same 100 companies):** hiring, public activity and the new registry fields. Public activity was found for 89 of 100 companies (243 dated events), group membership for 100, latest filed accounts year for 92, share capital for 86, contact points for 63 and former names for 50. One company had a confirmed active NAV job ad, matched through its sub-unit's organisation number. 0 integrity issues; an immediate re-run detected 0 changes. Details are in [`examples/smoke-100-v2-report.json`](examples/smoke-100-v2-report.json).
 
+**1,000-company live test (21 October 2026, the version before this one):** 1,000 companies drawn at random from Builderr's official company list. All 1,000 envelopes were `available`, with 0 integrity issues, 60,012 claims and 5,012 requests, in 228 s. An immediate re-run detected 0 changes. Two gaps showed up. Only 11% of companies register a website. NAV ads posted under a brand name were missed: 1 of 3 companies with active ads was found. This version's website step and organisation-number ad index address both. Details are in [`examples/smoke-1000-report.json`](examples/smoke-1000-report.json), with the sample in `examples/smoke-1000.txt`.
+
 To smoke-test against the live registry on a random sample of real companies:
 
 ```bash
@@ -119,14 +138,16 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (64 checks) runs against simulated registry and NAV responses. It covers:
+The offline self-test (89 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
 - missing-not-zero rules
 - evidence integrity
 - idempotent re-runs, real change detection, and no false removals during an outage
-- job ads: namesake employers rejected, inactive ads removed, NAV outage handled
+- job ads: namesake employers rejected, brand-name ads found by organisation number, inactive ads removed, NAV outage handled
+- websites: verified by organisation number or by name plus registered address; namesake, parked, group (ambiguous) and name-only sites not published; private addresses never contacted; robots.txt respected
+- profiles and contacts: share buttons, web-agency links and other-domain emails excluded; no false removals when a site is down or the web is unreachable
 - input formats, unfamiliar column or key names, and malformed numbers
 
 ## Web app
@@ -143,9 +164,13 @@ npm run dev        # http://localhost:3000
 
 ```
 agent/run.ts       batch runner (the evaluator command)
-agent/profile.ts   per-company research, refresh diff, summary
+agent/input.ts     input file parsing (txt, csv, jsonl, json, gz)
+agent/profile.ts   per-company research (gather, then assemble), refresh diff, summary
 agent/extract.ts   registry response → claims and evidence
-agent/brreg.ts     HTTP client: concurrency, retries, budget, snapshots
+agent/brreg.ts     HTTP client for the registers and NAV: concurrency, retries, budget, snapshots
+agent/jobs.ts      NAV job feed index by employer organisation number
+agent/website.ts   official website candidates, identity verification, profiles and contact links
+agent/web.ts       safe fetcher for company websites: public-URL guard, robots.txt, limits
 agent/types.ts     envelope schema
 agent/test/        offline self-test and registry fixtures (fictitious companies)
 scripts/           sample-batch.ts: random sample of real organisation numbers for smoke tests

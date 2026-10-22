@@ -53,19 +53,7 @@ export class ClaimBuilder {
     const key = keySuffix ? `${family}#${field}#${keySuffix}` : `${family}#${field}`;
     if (this.keys.has(key)) return; // same fact listed twice in a source → publish once
     this.keys.add(key);
-    const evId = `ev:${this.orgnr}:${snap.source}:${(snap.content_sha256 || 'none').slice(0, 12)}:${claimSpan}`;
-    if (!this.evidence.has(evId)) {
-      this.evidence.set(evId, {
-        id: evId,
-        snapshot_id: snap.id,
-        source_url: snap.source_url,
-        source_class: 'official_registry',
-        retrieved_at: snap.retrieved_at,
-        content_sha256: snap.content_sha256,
-        claim_span: claimSpan,
-        reporting_period: opts.reportingPeriod ?? null,
-      });
-    }
+    const evId = this.evidenceFor(snap, claimSpan, opts.reportingPeriod ?? null);
     this.claims.push({
       id: `cl:${this.orgnr}:${sha(key + '|' + stableStringify(value))}`,
       key,
@@ -80,6 +68,72 @@ export class ClaimBuilder {
       source_date: opts.sourceDate ?? null,
       retrieved_at: snap.retrieved_at,
     });
+  }
+
+  /** Records evidence once and returns its ID. JSON paths are used as-is in the ID; text spans
+   *  from web pages are hashed so IDs stay short and stable. */
+  evidenceFor(snap: SourceSnapshot, claimSpan: string, reportingPeriod: ReportingPeriod | null = null): string {
+    const spanId = claimSpan.startsWith('$') ? claimSpan : `txt:${sha(claimSpan, 16)}`;
+    const evId = `ev:${this.orgnr}:${snap.source}:${(snap.content_sha256 || 'none').slice(0, 12)}:${spanId}`;
+    if (!this.evidence.has(evId)) {
+      this.evidence.set(evId, {
+        id: evId,
+        snapshot_id: snap.id,
+        source_url: snap.source_url,
+        source_class: snap.source_class,
+        retrieved_at: snap.retrieved_at,
+        content_sha256: snap.content_sha256,
+        claim_span: claimSpan,
+        reporting_period: reportingPeriod,
+      });
+    }
+    return evId;
+  }
+
+  /** Adds a second source to an existing claim (e.g. the company's own site confirming the registered website). */
+  addEvidence(key: string, snap: SourceSnapshot, claimSpan: string, confidence?: number) {
+    const c = this.claims.find((x) => x.key === key);
+    if (!c) return;
+    const evId = this.evidenceFor(snap, claimSpan);
+    if (!c.evidence_ids.includes(evId)) c.evidence_ids.push(evId);
+    if (confidence !== undefined) c.confidence = confidence;
+  }
+
+  /** Adds a claim backed by evidence already recorded (e.g. a second fact from the same registry field). */
+  addFromEvidence(evidenceId: string, family: FieldFamily, field: string, keySuffix: string | null, value: ClaimValue, confidence = 1) {
+    const ev = this.evidence.get(evidenceId);
+    if (!ev) return;
+    const key = keySuffix ? `${family}#${field}#${keySuffix}` : `${family}#${field}`;
+    if (this.keys.has(key)) return;
+    this.keys.add(key);
+    this.claims.push({
+      id: `cl:${this.orgnr}:${sha(key + '|' + stableStringify(value))}`,
+      key,
+      family,
+      field,
+      value,
+      availability: 'available',
+      confidence,
+      evidence_ids: [evidenceId],
+      reporting_period: null,
+      source_date: null,
+      retrieved_at: ev.retrieved_at,
+    });
+  }
+
+  setConfidence(key: string, confidence: number) {
+    const c = this.claims.find((x) => x.key === key);
+    if (c) c.confidence = confidence;
+  }
+
+  /** Withdraws a claim (and evidence no other claim uses). */
+  remove(key: string) {
+    const c = this.claims.find((x) => x.key === key);
+    if (!c) return;
+    this.claims = this.claims.filter((x) => x !== c);
+    this.keys.delete(key);
+    const used = new Set(this.claims.flatMap((x) => x.evidence_ids));
+    for (const id of c.evidence_ids) if (!used.has(id)) this.evidence.delete(id);
   }
 
   count(family: FieldFamily) {
