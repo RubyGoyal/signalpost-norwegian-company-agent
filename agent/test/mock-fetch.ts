@@ -334,7 +334,9 @@ const WEB: Record<string, Site> = {
         `<h1>Jobb hos oss</h1>
          <ul><li><a href="https://alphatest.teamtailor.com/jobs/123456-backend-utvikler">Backend-utvikler</a></li>
          <li><a href="https://arbeidsplassen.nav.no/stillinger/stilling/11111111-1111-4111-8111-111111111111">Senior utvikler (NAV)</a></li>
-         <li><a href="/karriere/sommerjobb-2027">Sommerjobb 2027</a></li></ul>
+         <li><a href="/karriere/sommerjobb-2027">Sommerjobb 2027</a></li>
+         <li><a href="/karriere/vare-verdier">Våre verdier og kultur</a></li>
+         <li><a href="/karriere/apen-soknad">Send en åpen søknad</a></li></ul>
          <a href="/karriere">Karriere</a> <a href="https://alphatest.teamtailor.com/jobs">Se alle</a>`,
         '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","url":"https://alphatest.teamtailor.com/jobs/654321-prosjektleder"},{"@context":"https://schema.org","@type":"JobPosting","title":"Utgått stilling","datePosted":"2019-01-01","validThrough":"2020-01-01"}]</script>'
       ),

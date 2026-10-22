@@ -49,7 +49,7 @@ Optional flags and environment variables:
 | `claims` | One per fact: `field`, `value`, `unit`, `reporting_period`, `source_date`, `retrieved_at`, `evidence_ids` |
 | `evidence` | Source URL, source class (`official_registry`, `official_job_board` or `company_owned`), `claim_span` (the JSON path in a register response, or the exact text or link on a company web page), retrieval time, SHA-256 of the source response, reporting period |
 | `source_snapshots` | Every request: URL, HTTP status, retrieval time, content hash, licence |
-| `summary` | What the company does, its size, people, locations, status, what changed and what is unknown. Each statement links to its evidence. |
+| `summary` | Starts with an "at a glance" line: organisation form, place, industry, employees, latest revenue and its change on the previous year, hiring, website. Then what the company does, size, people, locations, status, website and profiles, hiring, registry activity, website news, what changed, and what is unknown. Each statement links to its evidence. |
 | `changes` | Material changes since the previous run (`new_value`, `changed_value`, `removed_value`) with before and after values and the previous evidence |
 | `refresh` | `cold_start` or `previous_run`, the previous run ID and date, the same change list, and the number of unchanged claims |
 | `run`, `operations`, `errors` | Run ID and timing, requests used, third-party cost ($0), and any source errors |
@@ -67,8 +67,8 @@ Optional flags and environment variables:
 - **Company-owned profiles:** LinkedIn, Facebook, Instagram, X, YouTube and TikTok pages that the verified website links to (or that the company registered as its website)
 - Contact points: registered company email and phone, plus email and phone links on the verified website's own domain (never published for sole proprietorships)
 - Group structure
-- **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units, including ads posted under a brand name
-- **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed"
+- **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units (including ads posted under a brand name). Also the verified website's careers page and the openings it lists: job-board ad links, its own job pages and structured `JobPosting` data.
+- **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated news items from the verified website's news page.
 
 ## Rules the agent follows
 
@@ -79,6 +79,7 @@ Optional flags and environment variables:
 - **Personal data minimisation.** Role holders' names are published (they are public register data). Birth dates are not. Job ad contact persons are never published, and contact details of sole proprietorships are left out.
 - **Hiring by organisation number.** Every active NAV ad's detail record is read once per run and indexed by the employer's organisation number, so an ad posted under a brand name is still found and a namesake employer never matches. If that read cannot finish in its time budget, the remaining ads are picked by employer name and still confirmed by organisation number.
 - **A website is a claim only after proof.** Candidate sites (registered website, registered email domain, domains spelled from the legal name) are only guesses. A site is published as the official website when it shows the company's organisation number, or when its homepage carries the full legal name and (for name-spelled domains) the site also shows the registered phone number or street address. Parked or for-sale pages are rejected. A site that lists several organisation numbers (a group site) is reported as `ambiguous`, and one that shows a different organisation number is rejected.
+- **News and openings only from a verified site.** A news item is published only with a date found in the item itself (or in its structured data). Openings come from links to job-board ads, the site's own job pages, or structured `JobPosting` data that has not expired. A careers-page link to a NAV ad that is already attached is not counted twice.
 - **Profiles and contacts only from a verified site.** Social profiles are taken from the verified website's links and structured data, and only when the profile name matches the legal name or the site's own domain (a web agency's page is not the company's). Share buttons and personal profiles are ignored. Email and phone links are taken only on the site's own domain.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
@@ -92,7 +93,7 @@ Optional flags and environment variables:
 | Regnskapsregisteret (accounts) | `https://data.brreg.no/regnskapsregisteret/regnskap/{orgnr}` | NLOD 2.0 |
 | Enhetsregisteret (change log) | `https://data.brreg.no/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer={orgnr}` | NLOD 2.0 |
 | NAV job vacancy feed | `https://pam-stilling-feed.nav.no/api/v1/feed` and `/api/v1/feedentry/{uuid}` | [NAV API terms](https://arbeidsplassen.nav.no/vilkar-api): ads may be republished; inactive ads must be removed |
-| Company-owned websites | The company's own homepage plus at most two contact or about pages | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
+| Company-owned websites | The company's own homepage, up to three contact, about or terms pages, and its news and careers pages | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
 
 **Registers and NAV.** Requests to these APIs go only to `data.brreg.no` and `pam-stilling-feed.nav.no`, over HTTPS. Any other host or a redirect off those hosts is refused in code (`ALLOWED_HOSTS` in `agent/brreg.ts`). Registry requests are rate-limited (default 8 concurrent) with retries and backoff on 429 and 5xx responses. Each company needs 5 or 6 registry requests: entity, roles, accounts, sub-units and change log.
 
@@ -149,7 +150,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (90 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (99 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -159,6 +160,8 @@ The offline self-test (90 checks) runs against simulated registry, NAV and compa
 - job ads: namesake employers rejected, brand-name ads found by organisation number, inactive ads removed, NAV outage handled
 - websites: verified by organisation number or by name plus registered address; namesake, parked, group (ambiguous) and name-only sites not published; private addresses never contacted; robots.txt respected
 - profiles and contacts: share buttons, web-agency links and other-domain emails excluded; no false removals when a site is down or the web is unreachable
+- website news and careers pages: dated items only (from the item's own block), older items left out, expired and generic job links left out, NAV ads not counted twice
+- summary: the at-a-glance line, including the revenue trend
 - input formats, unfamiliar column or key names, and malformed numbers
 
 ## Web app

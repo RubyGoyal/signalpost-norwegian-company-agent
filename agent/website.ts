@@ -626,6 +626,8 @@ const CAREERS_PATH = /\/(karriere|karrierer|jobb|jobbe-hos-oss|jobb-hos-oss|ledi
 const CAREERS_TEXT = /^(karriere|jobb hos oss|jobbe hos oss|ledige stillinger|stillinger|careers?|jobs|jobb|bli en av oss|work with us|join us|rekruttering)$/i;
 const GENERIC_LINK = /^(les mer|les hele|se mer|mer|søk|søk her|søk nå|se stilling|se alle|vis alle|apply|apply now|read more|her|klikk her|ledige stillinger|karriere|jobb|nyheter|aktuelt|news|blogg|forrige|neste|next|previous)$/i;
 const JOB_HOSTS = /(^|\.)(teamtailor\.com|webcruiter\.(com|no)|jobbnorge\.no|finn\.no|arbeidsplassen\.nav\.no|recman\.(no|page)|hrmanager\.no|hr-manager\.net|jobylon\.com|reachmee\.com|easycruit\.com|simplyrecruit\.no|varbi\.com|talentech\.com|jobs\.lever\.co|boards\.greenhouse\.io|smartrecruiters\.com|workable\.com)$/i;
+// Pages under a careers section that describe the employer rather than an opening.
+const NOT_AN_OPENING = /(verdier|kultur|culture|values|fordeler|benefits|goder|hvorfor|why-|why |prosess|process|faq|sp[oø]rsm[aå]l|om-oss|om oss|about|medarbeidere|ansatte|v[aå]re-folk|v[aå]re folk|our-people|our people|\bteam\b|historier|stories|arbeidsmilj|kontakt|contact|personvern|privacy|[aå]pen-s[oø]knad|[aå]pen s[oø]knad|open-application|open application|abonner|subscribe|logg inn|login)/i;
 const JOB_AD_HINT = /(\/jobs?\/[\w-]*\d|\/job\/|finnkode=|advertid=|\/stilling\/|\/ledige-stillinger\/stilling\/|\/vacanc|\/position|\/annonse|\/job-ad|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 
 export interface SiteNewsItem { date: string; title: string; url: string; snapshot: SourceSnapshot; via: string }
@@ -802,6 +804,7 @@ export async function readSiteActivity(
           u.pathname.replace(/\/$/, '').startsWith(`${careersPath}/`) &&
           u.pathname.replace(/\/$/, '') !== careersPath;
         if (!external && !own) continue;
+        if (own && (NOT_AN_OPENING.test(title) || NOT_AN_OPENING.test(u.pathname))) continue;
         const url = `${u.origin}${u.pathname}${u.search}`;
         if (seen.has(url)) continue;
         seen.add(url);
