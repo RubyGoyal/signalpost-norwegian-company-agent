@@ -22,6 +22,7 @@ const J = '910000829'; // email domain resolves to a private address → never c
 const K = '910000837'; // registered website disallows robots → not read
 const L = '910000845'; // name-spelled domain shows only the name → not enough
 const M = '910000888'; // registered "website" is a Facebook page → a registered profile, not crawled
+const N = '910000896'; // email-domain site: brand-only title, full legal name in the footer → verified
 
 const env: Record<string, string | undefined> = (globalThis as any).process?.env ?? {};
 const mutate = env.MOCK_MUTATE === '1';
@@ -95,6 +96,7 @@ const entities: Record<string, unknown> = {
       [K, 'TESTSELSKAP ZETA AS', { hjemmeside: 'www.zeta-test.no' }],
       [L, 'TESTSELSKAP ETA AS', { epostadresse: 'post@eta-mail.no' }],
       [M, 'TESTSELSKAP THETA AS', { hjemmeside: 'https://www.facebook.com/testselskaptheta' }],
+      [N, 'IOTA HANDEL OG SERVICE AS', { epostadresse: 'post@iota-butikk.no' }],
     ] as [string, string, Record<string, string>][]).map(([o, navn, extra]) => [
       o,
       {
@@ -284,6 +286,7 @@ const DNS: Record<string, string> = {
   'www.zeta-test.no': PUBLIC_IP,
   'testselskapeta.no': PUBLIC_IP,
   'eta-mail.no': PUBLIC_IP,
+  'iota-butikk.no': PUBLIC_IP,
   'www.eta-mail.no': PUBLIC_IP,
 };
 (globalThis as any).__SIGNALPOST_DNS__ = async (host: string) => {
@@ -335,6 +338,9 @@ const WEB: Record<string, Site> = {
     pages: { '/': page('Testselskap Zeta AS', '<footer>Org.nr 910 000 837 <a href="https://facebook.com/testselskapzeta">fb</a></footer>') },
   },
   'testselskapeta.no': { pages: { '/': page('Testselskap Eta', '<p>Velkommen til Testselskap Eta. Vi tilbyr gode tjenester til våre kunder over hele landet.</p>') } },
+  'iota-butikk.no': {
+    pages: { '/': page('Iota Butikk – alt til hjemmet', '<p>Nettbutikk for kjøkken og interiør.</p><footer>Copyright &copy; 2026 Iota Handel og Service AS &ndash; alle rettigheter reservert</footer>') },
+  },
 };
 const html = (body: string) => new Response(body, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 function webResponse(url: URL): Response {

@@ -149,7 +149,7 @@ check(r6.length === 3 && by(r6, '91000006')?.errors[0]?.code === 'invalid_organi
 
 // --- Company websites: verification, profiles, contact links ------------------------------
 const webIn = path.join(work, 'web.csv');
-writeFileSync(webIn, ['orgnr', '910000063', '910000098', '910000802', '910000810', '910000829', '910000837', '910000845', '910000721', '910000888'].join('\n'));
+writeFileSync(webIn, ['orgnr', '910000063', '910000098', '910000802', '910000810', '910000829', '910000837', '910000845', '910000721', '910000888', '910000896'].join('\n'));
 const wsState = path.join(work, 'web-state');
 const wrun = (name: string, env: Record<string, string> = {}) => {
   const out = path.join(work, name);
@@ -174,6 +174,7 @@ check(wa('910000802').official_website.state === 'ambiguous' && !wc('910000802',
 check(wa('910000810').official_website.reason === 'registered_website_parked' && !wc('910000810', 'website').length, 'website: parked registered domain not published as a website');
 check(!wc('910000829', 'website').length && !by(w1, '910000829').source_snapshots.some((s) => s.source_url.includes('epsilon-test.no') && s.ok), 'website: domain resolving to a private address is never contacted');
 check(wc('910000837', 'website')[0]?.evidence_ids.length === 1 && !wc('910000837', 'social_profile').length && !by(w1, '910000837').source_snapshots.some((s) => s.source_url.includes('zeta-test.no') && s.ok), 'website: robots.txt disallow respected (page not read, registered website kept as registered)');
+check((wc('910000896', 'website')[0]?.value as any)?.found_via === 'registered_email_domain' && wa('910000896').official_website.state === 'available', 'website: email-domain site verified by the full legal name in its text');
 check(!wc('910000845', 'website').length && wa('910000845').official_website.reason === 'no_verified_website_found', 'website: name alone on a guessed domain is not enough; a mail-only email domain is "no site", not a failure');
 check(!by(w1, '910000721').claims.some((c) => c.family === 'contact_points'), 'website: no contact details for a sole proprietorship');
 check((wc('910000888', 'social_profile')[0]?.value as any)?.url === 'https://facebook.com/testselskaptheta' && wa('910000888').company_profiles.reason === 'registered_in_enhetsregisteret' && !by(w1, '910000888').source_snapshots.some((s) => s.source === 'company_website'), 'profiles: a Facebook page registered as the website becomes a registered profile; the platform is not crawled');

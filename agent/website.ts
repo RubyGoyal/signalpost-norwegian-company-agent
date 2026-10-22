@@ -303,7 +303,15 @@ export function analyzePage(page: WebPage): PageAnalysis {
 // ---------------------------------------------------------------------------
 // Verification
 // ---------------------------------------------------------------------------
-const PRIORITY = [/kontakt/i, /contact/i, /om-?oss|om oss/i, /about/i, /firma|selskap|company/i, /personvern|privacy|vilk[aå]r|terms/i];
+const PRIORITY = [
+  /kontakt/i,
+  /contact/i,
+  /om-?oss|om oss/i,
+  /about/i,
+  /betingelser|kj[oø]psvilk[aå]r|salgsvilk[aå]r|vilk[aå]r|terms|impressum/i,
+  /firma|selskap|company/i,
+  /personvern|privacy/i,
+];
 
 function priorityLinks(a: PageAnalysis, domain: string, limit: number): string[] {
   const scored = new Map<string, number>();
@@ -347,6 +355,15 @@ function nameOnHomepage(home: PageAnalysis, host: string, tokens: string[]): str
     const compact = translit(p).replace(/[^a-z0-9]/g, '');
     if (tokens.every((x) => t.has(x)) || (tokens.length > 1 && compact.includes(tokens.join('')))) return p;
   }
+  return null;
+}
+
+/** The full legal name, legal form included (e.g. "Ballong & Partygrossisten AS"), in a page's text. */
+function legalNameInText(pages: PageAnalysis[], legalName: string): { page: PageAnalysis; text: string } | null {
+  const norm = (x: string) => ` ${translit(x).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  const name = norm(legalName);
+  if (name.trim().length < 6 || name.trim().split(' ').length < 2) return null;
+  for (const p of pages) if (norm(`${p.title} ${p.text}`).includes(name)) return { page: p, text: legalName };
   return null;
 }
 
@@ -417,7 +434,7 @@ export async function verifyCandidate(
 
   const pages = [homeA];
   if (!homeA.orgnrs.has(id.orgnr)) {
-    for (const link of priorityLinks(homeA, finalDomain, 2)) {
+    for (const link of priorityLinks(homeA, finalDomain, 3)) {
       if (signal?.aborted) break;
       const r = await web.getPage(link, `${snapPrefix}:${finalDomain}:${new URL(link).pathname}`, signal);
       snapshots.push(r.outcome === 'ok' ? r.page.snapshot : r.snapshot);
@@ -433,14 +450,18 @@ export async function verifyCandidate(
   const withOurs = pages.find((p) => p.orgnrs.has(id.orgnr));
   const others = new Set<string>();
   for (const p of pages) for (const n of p.orgnrs.keys()) if (n !== id.orgnr) others.add(n);
-  const nameHit = nameOnHomepage(homeA, finalHost, tokens);
+  // Homepage identity (title, site name, structured data, host) is required when the site lists
+  // several organisation numbers; the legal name anywhere in the text is enough otherwise.
+  const homeName = nameOnHomepage(homeA, finalHost, tokens);
+  const inText = legalNameInText(pages, id.legalName);
+  const nameHit = homeName || (inText ? `page text: ${inText.text}` : null);
   const base = { pages, homeUrl, candidate: { ...cand, host: finalHost, domain: finalDomain } };
 
   if (withOurs) {
     const span = withOurs.orgnrs.get(id.orgnr)!;
     if (others.size === 0)
       return v('exact', 'organisation_number_on_site', { ...base, method: 'organisation_number_on_site', confidence: 0.99, proof: { page: withOurs, span } });
-    if (nameHit)
+    if (homeName)
       return v('exact', 'organisation_number_and_name_on_site', { ...base, method: 'organisation_number_and_name_on_site', confidence: 0.95, proof: { page: withOurs, span } });
     return v('ambiguous', 'site_shows_several_organisation_numbers', base);
   }
