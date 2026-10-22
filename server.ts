@@ -97,9 +97,11 @@ function row(e: Envelope) {
   const nace = e.claims
     .filter((c) => c.field === 'nace_code')
     .sort((a, b) => ((a.value as any).rank ?? 9) - ((b.value as any).rank ?? 9))[0]?.value as any;
-  const revenue =
-    e.claims.find((c) => c.field === 'operating_revenue' && c.key.includes('#SELSKAP#')) ||
-    e.claims.find((c) => c.field === 'operating_revenue');
+  const revs = e.claims
+    .filter((c) => c.field === 'operating_revenue')
+    .sort((a, b) => String(b.reporting_period?.to).localeCompare(String(a.reporting_period?.to)));
+  const revenue = revs.find((c) => c.key.includes('#SELSKAP#')) || revs[0];
+  const site = one('website')?.value as any;
   const ceo = e.claims.find((c) => c.field === 'role' && (c.value as any).role_code === 'DAGL');
   const retrieved = e.source_snapshots.map((s) => s.retrieved_at).sort().pop() || null;
   return {
@@ -112,6 +114,8 @@ function row(e: Envelope) {
     employees: (one('registered_employees')?.value as number) ?? null,
     revenue: revenue ? { value: revenue.value, unit: revenue.unit ?? null, period_to: revenue.reporting_period?.to ?? null } : null,
     ceo: ceo ? (ceo.value as any).name : null,
+    website: site?.url ?? null,
+    hiring: e.claims.filter((c) => c.field === 'job_ad' || c.field === 'site_job').length,
     families_available: Object.values(e.availability).filter((a) => a.state === 'available').length,
     changes: e.refresh.changes.length,
     retrieved_at: retrieved,

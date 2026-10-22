@@ -52,7 +52,7 @@ const FAMILY_LABELS: Record<FieldFamily, string> = {
   company_profiles: 'Company-owned profiles',
   contact_points: 'Contact points',
   group_structure: 'Group structure',
-  job_postings: 'Hiring (NAV job ads)',
+  job_postings: 'Hiring',
   public_activity: 'Public activity',
 };
 
@@ -101,6 +101,9 @@ const FIELD_LABELS: Record<string, string> = {
   phone: 'Phone',
   mobile: 'Mobile',
   social_profile: 'Profile',
+  site_news: 'News (company website)',
+  site_job: 'Opening (careers page)',
+  careers_page: 'Careers page',
   job_ad: 'Job ad',
   registry_event: 'Registry event',
 };
@@ -144,6 +147,8 @@ const REASON_TEXT: Record<string, string> = {
   linked_from_verified_website: 'Linked from its verified website',
   no_profiles_linked_from_verified_website: 'Checked: none linked from its website',
   no_verified_website: 'No verified website to read from',
+  found_on_company_website: 'Found on its website',
+  found_on_company_website_nav_unavailable: 'Found on its website (NAV unavailable this run)',
 };
 
 const fmtNum = (n: number) => n.toLocaleString('en-US');
@@ -157,6 +162,12 @@ function fieldLabel(c: Claim): string {
     return `${FIELD_LABELS[c.field] || c.field}${type}`;
   }
   return FIELD_LABELS[c.field] || c.field.replace(/_/g, ' ');
+}
+
+/** Latest filed figure for a field, company accounts preferred over group accounts. */
+function latestFigure(e: Envelope, field: string): Claim | undefined {
+  const all = e.claims.filter((c) => c.field === field).sort((a, b) => String(b.reporting_period?.to).localeCompare(String(a.reporting_period?.to)));
+  return all.find((c) => c.key.includes('#SELSKAP#')) || all[0];
 }
 
 function formatValue(c: Claim): ReactNode {
@@ -190,6 +201,34 @@ function formatValue(c: Claim): ReactNode {
   if (c.field === 'former_name') return `${v.name}${v.from || v.to ? ` (${v.from || '?'} → ${v.to || '?'})` : ''}`;
   if (c.field === 'registry_notice') return `${v.text}${v.date ? ` (${v.date})` : ''}`;
   if (c.field === 'registry_event') return `${v.date}: ${v.event}`;
+  if (c.field === 'site_news')
+    return (
+      <span>
+        <span className="text-slate-500">{v.date}: </span>
+        <a href={v.url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2 break-words">
+          {v.title}
+        </a>
+      </span>
+    );
+  if (c.field === 'site_job')
+    return (
+      <span>
+        <a href={v.url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2 break-words">
+          {v.title}
+        </a>
+        <span className="text-slate-500">
+          {v.listed_on ? ` · ${v.listed_on}` : ''}
+          {v.posted ? ` · posted ${v.posted}` : ''}
+          {v.expires ? ` · until ${v.expires}` : ''}
+        </span>
+      </span>
+    );
+  if (c.field === 'careers_page')
+    return (
+      <a href={v.url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2 break-all">
+        {v.url}
+      </a>
+    );
   if (c.field === 'job_ad')
     return (
       <span>
@@ -573,6 +612,8 @@ interface Row {
   employees: number | null;
   revenue: { value: number; unit: string | null; period_to: string | null } | null;
   ceo: string | null;
+  website: string | null;
+  hiring: number;
   families_available: number;
   changes: number;
 }
@@ -623,7 +664,7 @@ function BatchView() {
             ['Results written', fmtNum(report.envelope_count)],
             ['Found', fmtNum(report.states?.available || 0)],
             ['Not found / failed', `${fmtNum(report.states?.not_available || 0)} / ${fmtNum(report.states?.failed || 0)}`],
-            ['Registry requests', fmtNum(report.requests_total)],
+            ['Requests (all sources)', fmtNum(report.requests_total)],
             ['Runtime · cost', `${report.runtime_seconds}s · $${report.third_party_cost_usd}`],
           ].map(([k, v]) => (
             <div key={k} className="bg-white border border-slate-200 rounded-lg px-3 py-2">
@@ -708,6 +749,13 @@ function BatchView() {
                       {r.name || r.organisation_number}
                     </a>
                     <div className="text-xs text-slate-500 font-mono">{r.organisation_number}{r.ceo ? <span className="font-sans"> · CEO {r.ceo}</span> : null}</div>
+                    {(r.website || r.hiring > 0) && (
+                      <div className="text-xs text-slate-500 break-all">
+                        {r.website ? r.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : null}
+                        {r.website && r.hiring > 0 ? ' · ' : null}
+                        {r.hiring > 0 ? <span className="text-emerald-700 font-medium">hiring ({r.hiring})</span> : null}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 hidden md:table-cell">{r.municipality || '—'}</td>
                   <td className="px-3 py-2 hidden lg:table-cell text-slate-600">{r.nace || '—'}</td>
@@ -765,13 +813,16 @@ function CompareView({ orgnrs }: { orgnrs: string[] }) {
     ['Business address', (e) => e.claims.find((c) => c.field === 'business_address')],
     ['Industry', (e) => e.claims.find((c) => c.field === 'nace_code' && (c.value as any).rank === 1)],
     ['Registered employees', (e) => e.claims.find((c) => c.field === 'registered_employees')],
-    ['Operating revenue', (e) => e.claims.find((c) => c.field === 'operating_revenue' && c.key.includes('#SELSKAP#')) || e.claims.find((c) => c.field === 'operating_revenue')],
-    ['Annual result', (e) => e.claims.find((c) => c.field === 'net_income' && c.key.includes('#SELSKAP#')) || e.claims.find((c) => c.field === 'net_income')],
-    ['Equity', (e) => e.claims.find((c) => c.field === 'equity' && c.key.includes('#SELSKAP#')) || e.claims.find((c) => c.field === 'equity')],
+    ['Operating revenue', (e) => latestFigure(e, 'operating_revenue')],
+    ['Annual result', (e) => latestFigure(e, 'net_income')],
+    ['Equity', (e) => latestFigure(e, 'equity')],
     ['CEO', (e) => e.claims.find((c) => c.field === 'role' && (c.value as any).role_code === 'DAGL')],
     ['Board chair', (e) => e.claims.find((c) => c.field === 'role' && (c.value as any).role_code === 'LEDE')],
     ['Auditor', (e) => e.claims.find((c) => c.field === 'role' && (c.value as any).role_code === 'REVI')],
     ['Website', (e) => e.claims.find((c) => c.field === 'website')],
+    ['Profile', (e) => e.claims.find((c) => c.field === 'social_profile')],
+    ['Latest job opening', (e) => e.claims.find((c) => c.field === 'job_ad') || e.claims.find((c) => c.field === 'site_job') || e.claims.find((c) => c.field === 'careers_page')],
+    ['Latest website news', (e) => e.claims.filter((c) => c.field === 'site_news').sort((a, b) => String((b.value as any).date).localeCompare(String((a.value as any).date)))[0]],
   ];
 
   return (
@@ -936,31 +987,33 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const nav: [string, string, Route['view'][]][] = [
-    ['Look up', '#/', ['home', 'company']],
-    ['Batch results', '#/batch', ['batch', 'compare']],
-    ['How it works', '#/about', ['about']],
+  const nav: [string, string, Route['view'][], string][] = [
+    ['Look up', '#/', ['home', 'company'], 'Look up'],
+    ['Batch results', '#/batch', ['batch', 'compare'], 'Batch'],
+    ['How it works', '#/about', ['about'], 'About'],
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center justify-between gap-6">
-            <a href="#/" className="text-lg font-bold tracking-tight font-display">
+          <div className="flex items-center justify-between gap-3 sm:gap-6 min-w-0">
+            <a href="#/" className="text-lg font-bold tracking-tight font-display shrink-0">
               Signalpost
             </a>
-            <nav className="flex items-center gap-4 text-sm" aria-label="Main">
-              {nav.map(([label, href, views]) => (
+            <nav className="flex items-center gap-3 sm:gap-4 text-sm min-w-0" aria-label="Main">
+              {nav.map(([label, href, views, short]) => (
                 <a
                   key={href}
                   href={href}
                   aria-current={views.includes(route.view) ? 'page' : undefined}
+                  aria-label={label}
                   className={`py-1 border-b-2 whitespace-nowrap ${
                     views.includes(route.view) ? 'border-blue-700 text-slate-900 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {label}
+                  <span className="sm:hidden">{short}</span>
+                  <span className="hidden sm:inline">{label}</span>
                 </a>
               ))}
             </nav>
@@ -977,7 +1030,7 @@ export default function App() {
       </main>
       <footer className="border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-xs text-slate-500">
-          Data: Brønnøysundregistrene open APIs (NLOD 2.0). Signalpost publishes only what the registers hold.
+          Data: Brønnøysundregistrene open APIs (NLOD 2.0), NAV's job vacancy feed and each company's own verified website. Every fact links to its source.
         </div>
       </footer>
     </div>

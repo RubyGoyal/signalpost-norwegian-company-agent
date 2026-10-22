@@ -149,6 +149,14 @@ const accounts: Record<string, unknown> = {
         driftsresultat: { driftsresultat: 4_000_000, driftsinntekter: { sumDriftsinntekter: mutate ? 61_500_000 : 58_000_000 }, driftskostnad: { sumDriftskostnad: 54_000_000 } },
       },
     },
+    {
+      id: 2,
+      regnskapstype: 'SELSKAP',
+      virksomhet: { organisasjonsnummer: A, organisasjonsform: 'AS', morselskap: false },
+      regnskapsperiode: { fraDato: '2024-01-01', tilDato: '2024-12-31' },
+      valuta: 'NOK',
+      resultatregnskapResultat: { aarsresultat: 2_000_000, driftsresultat: { driftsinntekter: { sumDriftsinntekter: 50_000_000 } } },
+    },
   ],
   [B]: [],
 };
@@ -303,7 +311,7 @@ const WEB: Record<string, Site> = {
     pages: {
       '/': page(
         'Testselskap Alpha &ndash; programvare',
-        `<nav><a href="/kontakt">Kontakt oss</a> <a href="https://www.facebook.com/sharer/sharer.php?u=x">Del</a></nav>
+        `<nav><a href="/kontakt">Kontakt oss</a> <a href="/nyheter">Nyheter</a> <a href="/karriere">Karriere</a> <a href="https://www.facebook.com/sharer/sharer.php?u=x">Del</a></nav>
          <p>Vi lager programvare for norske bedrifter.</p>
          <footer>Testselskap Alpha AS &middot; Org.nr 910&nbsp;000&nbsp;063 MVA &middot;
          <a href="mailto:salg@alpha-test.no">salg@alpha-test.no</a> <a href="mailto:post@alpha-test.no">post</a>
@@ -311,6 +319,24 @@ const WEB: Record<string, Site> = {
          <a href="https://www.facebook.com/testselskapalpha">Facebook</a>
          <a href="https://www.instagram.com/webbyraa/">Laget av Webbyr&aring;</a> <a href="mailto:hei@webbyraa.no">byr&aring;</a></footer>`,
         '<meta property="og:site_name" content="Alpha Test"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Testselskap Alpha AS","sameAs":["https://www.linkedin.com/company/alpha-test/"]}</script>'
+      ),
+      '/nyheter': page(
+        'Nyheter – Testselskap Alpha',
+        `<nav><a href="/nyheter">Nyheter</a> <a href="/">Hjem</a></nav>
+         <article><h2><a href="/nyheter/ny-avtale-med-kommunen">Ny avtale med Bergen kommune</a></h2><time datetime="2026-09-15">15. september 2026</time></article>
+         <article><a href="/nyheter/vi-flytter"><h3>Vi flytter til nye lokaler</h3></a><p>Publisert 3. mars 2025</p></article>
+         <article><a href="/nyheter/gammel-sak">Gammel sak fra arkivet vårt</a><span>12.06.2023</span></article>
+         <a href="/nyheter?side=2">Neste</a>`,
+        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"Alpha lanserer ny plattform","datePublished":"2026-06-01T08:00:00+02:00","url":"https://www.alpha-test.no/nyheter/ny-plattform"}</script>'
+      ),
+      '/karriere': page(
+        'Karriere – Testselskap Alpha',
+        `<h1>Jobb hos oss</h1>
+         <ul><li><a href="https://alphatest.teamtailor.com/jobs/123456-backend-utvikler">Backend-utvikler</a></li>
+         <li><a href="https://arbeidsplassen.nav.no/stillinger/stilling/11111111-1111-4111-8111-111111111111">Senior utvikler (NAV)</a></li>
+         <li><a href="/karriere/sommerjobb-2027">Sommerjobb 2027</a></li></ul>
+         <a href="/karriere">Karriere</a> <a href="https://alphatest.teamtailor.com/jobs">Se alle</a>`,
+        '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","url":"https://alphatest.teamtailor.com/jobs/654321-prosjektleder"},{"@context":"https://schema.org","@type":"JobPosting","title":"Utgått stilling","datePosted":"2019-01-01","validThrough":"2020-01-01"}]</script>'
       ),
     },
   },

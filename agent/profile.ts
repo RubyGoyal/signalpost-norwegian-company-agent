@@ -137,6 +137,30 @@ async function saveState(dir: string, s: StoredState) {
 }
 
 const fmtNum = (n: number) => n.toLocaleString('en-US');
+const titleCase = (x: string) => x.toLowerCase().replace(/(^|[\s-])(\S)/g, (_m, p: string, c: string) => p + c.toUpperCase());
+/** Plain-English names for common Norwegian organisation forms (the code is always shown too). */
+const FORM_EN: Record<string, string> = {
+  AS: 'private limited company',
+  ASA: 'public limited company',
+  ENK: 'sole proprietorship',
+  NUF: 'Norwegian branch of a foreign company',
+  SA: 'cooperative',
+  STI: 'foundation',
+  ANS: 'general partnership',
+  DA: 'partnership with shared liability',
+  KS: 'limited partnership',
+  BRL: 'housing cooperative',
+  ESEK: 'condominium',
+  FLI: 'association',
+  SAM: 'jointly owned property',
+  IKS: 'inter-municipal company',
+  KF: 'municipal enterprise',
+  FKF: 'county municipal enterprise',
+  SF: 'state enterprise',
+  ORGL: 'organisational unit',
+  PRE: 'shipping partnership',
+  BA: 'company with limited liability',
+};
 
 function buildSummary(
   claims: Claim[],
@@ -170,6 +194,50 @@ function buildSummary(
   }
 
   const nace = all('nace_code').sort((a, b) => ((a.value as any).rank ?? 9) - ((b.value as any).rank ?? 9))[0];
+
+  // At a glance: one decision-useful sentence built only from published claims.
+  if (name && availability.legal_identity.state !== 'failed') {
+    const f = form?.value as any;
+    const a = one('business_address')?.value as any;
+    const n = nace?.value as any;
+    const empC = one('registered_employees');
+    const rev = claims
+      .filter((c) => c.field === 'operating_revenue' && /#(SELSKAP|UNSPECIFIED)#/.test(c.key) && typeof c.value === 'number')
+      .sort((x, y) => String(y.reporting_period?.to).localeCompare(String(x.reporting_period?.to)));
+    const ads = all('job_ad').length + all('site_job').length;
+    const careers = one('careers_page');
+    const site = one('website');
+    const deletedC = one('deleted_date');
+    const flagsOn = claims.filter((c) => c.family === 'status_flags' && c.value === true && c.field !== 'registered_for_vat');
+    const where = a?.municipality || a?.city;
+    const bits: string[] = [];
+    const formEn = f?.code && FORM_EN[f.code] ? `${FORM_EN[f.code]} (${f.code})` : f?.description ? `${String(f.description).toLowerCase()}${f.code ? ` (${f.code})` : ''}` : '';
+    const what = `${formEn ? `${/^[aeiou]/i.test(formEn) ? 'an' : 'a'} ${formEn}` : 'a registered entity'}${where ? ` in ${titleCase(String(where))}` : ''}`;
+    bits.push(`${name.value} is ${what}${n?.description ? `, working in ${String(n.description).toLowerCase()}` : ''}`);
+    const size: string[] = [];
+    if (empC) size.push(`${fmtNum(empC.value as number)} registered employees`);
+    if (rev[0]) {
+      const y = String(rev[0].reporting_period?.to || '').slice(0, 4);
+      let trend = '';
+      const prev = rev.find((c) => String(c.reporting_period?.to).slice(0, 4) === String(Number(y) - 1));
+      if (prev && (prev.value as number) !== 0) {
+        const pctChange = Math.round((((rev[0].value as number) - (prev.value as number)) / Math.abs(prev.value as number)) * 100);
+        trend = `, ${pctChange >= 0 ? 'up' : 'down'} ${Math.abs(pctChange)}% on ${Number(y) - 1}`;
+      }
+      size.push(`operating revenue ${rev[0].unit || 'NOK'} ${fmtNum(rev[0].value as number)} in ${y}${trend}`);
+    }
+    if (size.length) bits.push(size.join(' and '));
+    if (deletedC) bits.push('it has been deleted from the register');
+    else if (flagsOn.length) bits.push(`registry flags: ${flagsOn.map((x) => x.field.replace(/_/g, ' ')).join(', ')}`);
+    if (ads) bits.push(`it is hiring (${ads} open position${ads === 1 ? '' : 's'} found)`);
+    else if (careers) bits.push('it has a careers page');
+    if (site) bits.push(`website ${(site.value as any).url}`);
+    const prevRev = rev.find((c) => rev[0] && String(c.reporting_period?.to).slice(0, 4) === String(Number(String(rev[0].reporting_period?.to).slice(0, 4)) - 1));
+    st.push({
+      text: `At a glance: ${bits.join('; ')}.`,
+      evidence_ids: ev(name, form, one('business_address'), nace, empC, rev[0], prevRev, site, careers, ...all('job_ad').slice(0, 2), ...all('site_job').slice(0, 2)),
+    });
+  }
   const purpose = one('statutory_purpose') || one('registered_activity');
   if (nace || purpose) {
     const n = nace?.value as any;
@@ -302,17 +370,23 @@ function buildSummary(
     });
 
   const ads = all('job_ad');
+  const siteJobs = all('site_job');
+  const careers = one('careers_page');
+  const hiring: string[] = [];
   if (ads.length) {
     const top = ads[0].value as any;
-    st.push({
-      text: `Hiring: ${ads.length} active job ad${ads.length === 1 ? '' : 's'} on arbeidsplassen.no (NAV)${
+    hiring.push(
+      `${ads.length} active job ad${ads.length === 1 ? '' : 's'} on arbeidsplassen.no (NAV)${
         top ? `, most recent "${top.title}"${top.published ? ` published ${top.published}` : ''}` : ''
-      }.`,
-      evidence_ids: ev(...ads.slice(0, 5)),
-    });
-  } else if (availability.job_postings.reason.startsWith('checked_nav_no_active_ads')) {
-    st.push({ text: 'Hiring: no active job ads found on arbeidsplassen.no (NAV) for this company or its sub-units.', evidence_ids: [] });
+      }`
+    );
+  } else if (availability.job_postings.checked_sources.includes('nav_job_feed') && !/failed|disabled/.test(availability.job_postings.reason)) {
+    hiring.push('no active job ads on arbeidsplassen.no (NAV) for this company or its sub-units');
   }
+  if (siteJobs.length)
+    hiring.push(`${siteJobs.length} opening${siteJobs.length === 1 ? '' : 's'} listed on its careers page (${siteJobs.slice(0, 3).map((j) => `"${(j.value as any).title}"`).join(', ')})`);
+  else if (careers) hiring.push(`a careers page at ${(careers.value as any).url}`);
+  if (hiring.length) st.push({ text: `Hiring: ${hiring.join('; ')}.`, evidence_ids: ev(...ads.slice(0, 5), ...siteJobs.slice(0, 3), careers) });
 
   const events = all('registry_event')
     .slice()
@@ -324,6 +398,18 @@ function buildSummary(
         .map((e) => `${(e.value as any).date} ${(e.value as any).event}`)
         .join('; ')}${events.length > 3 ? ` (${events.length} events since 2025)` : ''}.`,
       evidence_ids: ev(...events.slice(0, 3)),
+    });
+
+  const news = all('site_news')
+    .slice()
+    .sort((a, b) => String((b.value as any).date).localeCompare(String((a.value as any).date)));
+  if (news.length)
+    st.push({
+      text: `Latest news on its website: ${news
+        .slice(0, 3)
+        .map((n) => `${(n.value as any).date} "${(n.value as any).title}"`)
+        .join('; ')}${news.length > 3 ? ` (${news.length} dated items since 2025)` : ''}.`,
+      evidence_ids: ev(...news.slice(0, 3)),
     });
 
   if (baseline === 'cold_start') {
@@ -378,6 +464,9 @@ function buildSummary(
   if (unknowns.length)
     st.push({ text: `Unknown or not published: ${unknowns.map(reasonText).join(', ')}.`, evidence_ids: [] });
 
+  // The at-a-glance line leads the summary.
+  const glance = st.findIndex((x) => x.text.startsWith('At a glance:'));
+  if (glance > 0) st.unshift(...st.splice(glance, 1));
   return { generator: 'deterministic_v1', text: st.map((s) => s.text).join(' '), statements: st, unknowns };
 }
 
@@ -449,6 +538,22 @@ function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome) 
     b.add(p.page.snapshot, 'company_profiles', 'social_profile', p.profile.url, { platform: p.profile.platform, url: p.profile.url }, `${p.via}: ${p.profile.url}`, {
       confidence: 0.9,
     });
+  }
+  // Dated news and job openings published on the verified site.
+  const act = w.activity;
+  if (act) {
+    for (const n of act.news)
+      b.add(n.snapshot, 'public_activity', 'site_news', `site#${n.url}`, { date: n.date, title: n.title, url: n.url }, `news item (${n.via}): "${n.title}" ${n.date}`, {
+        sourceDate: n.date,
+        confidence: 0.85,
+      });
+    if (act.careersPage)
+      b.add(act.careersPage.snapshot, 'job_postings', 'careers_page', 'site#careers', { url: act.careersPage.url }, 'careers page on the verified website', { confidence: 0.9 });
+    for (const j of act.jobs)
+      b.add(j.snapshot, 'job_postings', 'site_job', `site#${j.url}#${j.title}`, { title: j.title, url: j.url, listed_on: j.listed_on, ...(j.posted ? { posted: j.posted } : {}), ...(j.expires ? { expires: j.expires } : {}) }, `job opening (${j.via}): ${j.title}`, {
+        sourceDate: j.posted,
+        confidence: 0.85,
+      });
   }
   // Contact links on the company's own domain. Never for sole proprietorships (a person's details).
   if (id.formCode === 'ENK') return;
@@ -525,7 +630,7 @@ export async function gatherCompany(rawOrgnr: string, inputIndex: number, ctx: R
     const id = identityFrom(orgnr, ent.json);
     const webTask = (async () => {
       try {
-        g.website = await findWebsite(ctx.web, id, ctx.websiteBudgetMs ?? 20_000);
+        g.website = await findWebsite(ctx.web, id, ctx.websiteBudgetMs ?? 20_000, since);
       } catch (e: any) {
         g.website = { state: 'incomplete', verdicts: [], verified: null, registryVerdict: null };
         g.errors.push({ source: 'company_website', code: 'website_step_error', message: String(e?.message || e) });
@@ -556,6 +661,7 @@ export async function gatherCompany(rawOrgnr: string, inputIndex: number, ctx: R
     if (g.actPages.some((p) => p.outcome === 'error')) g.errors.push({ source: 'oppdateringer', code: 'error', message: 'registry update feed lookup failed after retries' });
     if (g.website) {
       for (const v of g.website.verdicts) g.snapshots.push(...v.snapshots);
+      if (g.website.activity) g.snapshots.push(...g.website.activity.snapshots);
       websiteClaims(b, id, g.website);
       // Page texts are no longer needed; drop them so a large batch stays light in memory.
       for (const v of g.website.verdicts) {
@@ -664,6 +770,9 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
         const { snapshot, uuid, ...value } = ad;
         b.add(snapshot, 'job_postings', 'job_ad', uuid, value as any, '$.ad_content', { sourceDate: ad.published });
       }
+      // A careers-page link to an ad already attached from NAV is the same ad: keep one.
+      for (const ad of res.ads)
+        for (const c of b.claims.filter((x) => x.field === 'site_job' && String((x.value as any).url).includes(ad.uuid))) b.remove(c.key);
       if (res.ads.length) {
         jobsOutcome = 'ok';
         jobsReason = res.capped ? `found_in_source_first_${res.checked}_candidates_checked` : 'found_in_source';
@@ -715,6 +824,23 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
   // "jobs_source_disabled" is a skip with checked_sources cleared.
   if (ent.outcome === 'ok' && !ctx.jobs) availability.job_postings = { state: 'not_available', reason: 'jobs_source_disabled', checked_sources: [] };
   if (jobsError && availability.job_postings.state === 'failed') errors.push({ source: 'nav_job_feed', code: jobsError, message: 'job postings could not be checked in this run' });
+  // Hiring and activity also read from the verified company website.
+  const act = g.website?.activity;
+  const siteJobs = b.claims.some((c) => c.family === 'job_postings' && c.key.includes('#site#'));
+  if (act && ent.outcome === 'ok') {
+    const jp = availability.job_postings;
+    if (siteJobs && jp.state !== 'available')
+      availability.job_postings = { state: 'available', reason: jp.state === 'failed' ? 'found_on_company_website_nav_unavailable' : 'found_on_company_website', checked_sources: [...jp.checked_sources, 'company_website'] };
+    else if (act.careersChecked) availability.job_postings = { ...availability.job_postings, checked_sources: [...availability.job_postings.checked_sources, 'company_website'] };
+    if (act.newsChecked) {
+      const pa = availability.public_activity;
+      availability.public_activity = {
+        ...pa,
+        ...(pa.state === 'not_available' && b.claims.some((c) => c.field === 'site_news') ? { state: 'available' as const, reason: 'found_in_source' } : {}),
+        checked_sources: [...pa.checked_sources, 'company_website'],
+      };
+    }
+  }
 
   // Overall state follows the identity anchor. Deleted (410) and unknown (404) numbers
   // are reported as not_available rather than guessed at.
@@ -741,8 +867,12 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
   const families = (c: Claim) => availability[c.family]?.state;
   // Contact links read from the company website are only re-checked when the site was verified again.
   const siteVerified = !!g.website?.verified;
+  const careersChecked = !!g.website?.activity?.careersChecked;
   const notRechecked = (c: Claim) =>
-    UNCHECKED_REASONS.has(availability[c.family]?.reason) || (c.family === 'contact_points' && c.key.includes('#website#') && !siteVerified);
+    UNCHECKED_REASONS.has(availability[c.family]?.reason) ||
+    (c.field === 'job_ad' && jobsOutcome !== 'ok') ||
+    (c.family === 'contact_points' && c.key.includes('#website#') && !siteVerified) ||
+    (c.family === 'job_postings' && c.key.includes('#site#') && !(siteVerified && careersChecked));
   if (prev) {
     const prevByKey = new Map(prev.claims.map((c) => [c.key, c]));
     const prevEv = new Map(prev.evidence.map((e) => [e.id, e]));

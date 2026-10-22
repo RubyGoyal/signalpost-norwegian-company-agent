@@ -79,7 +79,7 @@ const evIds = new Set(A1.evidence.map((e) => e.id));
 check(A1.claims.every((c) => c.evidence_ids.length > 0 && c.evidence_ids.every((id) => evIds.has(id))), 'A: every claim points to existing evidence');
 check(A1.evidence.every((e) => /^https:\/\//.test(e.source_url) && e.retrieved_at && e.content_sha256), 'A: evidence has source URL, retrieval time and content hash');
 // latest_filed_accounts_year is a filing status from Enhetsregisteret, not a figure, so it has no period.
-check(A1.claims.filter((c) => c.family === 'annual_accounts' && c.field !== 'latest_filed_accounts_year').every((c) => c.reporting_period?.from === '2025-01-01'), 'A: every accounts figure carries its reporting period');
+check(A1.claims.filter((c) => c.family === 'annual_accounts' && c.field !== 'latest_filed_accounts_year').every((c) => /^202[45]-01-01$/.test(c.reporting_period?.from || '')), 'A: every accounts figure carries its reporting period (two filed years)');
 const roleNames = A1.claims.filter((c) => c.field === 'role').map((c) => (c.value as any).name);
 check(roleNames.includes('Ola Testmann') && roleNames.includes('Per Prøve Hansen') && roleNames.includes('TESTREVISJON AS'), 'A: CEO, chair and auditor published');
 check(!roleNames.includes('Gammel Fratrådt'), 'A: resigned board member not published');
@@ -113,17 +113,17 @@ check(!A4.refresh.changes.some((c) => c.family === 'roles'), 'A: roles outage do
 
 // --- Run 4b: NAV down → hiring failed, nothing removed, nothing invented ---------
 const A4b = by(run('run4b', { MOCK_MUTATE: '1', MOCK_NAV_DOWN: '1' }), '910000063');
-check(A4b.availability.job_postings.state === 'failed' && !A4b.claims.some((c) => c.family === 'job_postings'), 'NAV outage: job postings failed, no job claims');
-check(!A4b.refresh.changes.some((c) => c.family === 'job_postings'), 'NAV outage: no false job removals');
+check(!A4b.claims.some((c) => c.field === 'job_ad') && A4b.errors.some((e) => e.source === 'nav_job_feed') && A4b.availability.job_postings.reason === 'found_on_company_website_nav_unavailable', 'NAV outage: no NAV ads published, error recorded; careers-page openings still shown');
+check(!A4b.refresh.changes.some((c) => c.field === 'job_ad'), 'NAV outage: no false job removals');
 check(A4b.availability.legal_identity.state === 'available', 'NAV outage: registry facts unaffected');
 
 // --- Run 4c: jobs switched off → not checked, no removals ------------------------
 const A4c = by(run('run4c', { MOCK_MUTATE: '1', SIGNALPOST_JOBS: 'off' }), '910000063');
-check(A4c.availability.job_postings.reason === 'jobs_source_disabled' && !A4c.refresh.changes.some((c) => c.family === 'job_postings'), 'jobs off: reported as not checked, no false removals');
+check(!A4c.claims.some((c) => c.field === 'job_ad') && !A4c.refresh.changes.some((c) => c.field === 'job_ad'), 'jobs off: NAV not checked, no false removals');
 
 // --- Run 4d: the ad goes inactive → reported as removed, previous evidence kept ---
 const A4d = by(run('run4d', { MOCK_MUTATE: '1', MOCK_AD_INACTIVE: '1' }), '910000063');
-const gone = A4d.refresh.changes.find((c) => c.family === 'job_postings');
+const gone = A4d.refresh.changes.find((c) => c.field === 'job_ad' && c.type === 'removed_value');
 check(!A4d.claims.some((c) => (c.value as any)?.title === 'Senior utvikler') && gone?.type === 'removed_value' && (gone.previous_value as any)?.title === 'Senior utvikler' && (gone.previous_evidence?.length || 0) > 0, 'inactive ad: removed from profile, change recorded with previous evidence');
 
 // --- Run 5: deadline → still one row per input --------------------------------
@@ -188,6 +188,21 @@ const w4 = wrun('web4', { MOCK_NO_WEB: '1' });
 check(by(w4, '910000098').availability.official_website.reason === 'website_check_not_run' && !by(w4, '910000098').refresh.changes.some((c) => c.type === 'removed_value'), 'no public web: website step reported as not run, no false removals');
 const w5 = wrun('web5', { SIGNALPOST_JOBS_DETAIL_SCAN: 'off' });
 check(wc('910000063', 'job_ad').length === 2 && by(w5, '910000063').claims.filter((c) => c.field === 'job_ad').length === 1, 'hiring: without the full ad read only the name-matched ad is found (fallback still confirms by number)');
+
+// --- Site news, careers page and the at-a-glance summary ---------------------------------
+const aW = by(w1, '910000063');
+const newsA = aW.claims.filter((c) => c.field === 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).sort();
+check(newsA.join('|') === '2025-03-03 Vi flytter til nye lokaler|2026-06-01 Alpha lanserer ny plattform|2026-09-15 Ny avtale med Bergen kommune', `site news: dated items from the news page and structured data, older items left out (got ${newsA.join('|')})`);
+check(aW.claims.filter((c) => c.field === 'site_news').every((c) => c.source_date && c.family === 'public_activity'), 'site news: each item is dated public activity');
+const jobsA = aW.claims.filter((c) => c.field === 'site_job').map((c) => (c.value as any).title).sort();
+check(jobsA.join('|') === 'Backend-utvikler|Prosjektleder|Sommerjobb 2027', `careers page: openings from job-board links, own pages and JobPosting data; expired and generic links left out (got ${jobsA.join('|')})`);
+check(!aW.claims.some((c) => c.field === 'site_job' && String((c.value as any).url).includes('11111111-1111')), 'careers page: a link to a NAV ad already attached is not counted twice');
+check(aW.claims.some((c) => c.field === 'careers_page') && aW.availability.job_postings.checked_sources.includes('company_website'), 'careers page published as a hiring signal; job postings record the website as checked');
+check(aW.summary.statements[0]?.text.startsWith('At a glance: TESTSELSKAP ALPHA AS is a private limited company (AS) in Oslo') && aW.summary.text.includes('up 16% on 2024') && aW.summary.text.includes('it is hiring'), 'summary: at-a-glance line with form, place, revenue trend and hiring');
+check(aW.summary.text.includes('Latest news on its website: 2026-09-15 "Ny avtale med Bergen kommune"') && aW.summary.text.includes('openings listed on its careers page'), 'summary: latest site news and careers-page openings');
+check(by(w1, '910000098').summary.statements[0]?.text.startsWith('At a glance: TESTSELSKAP BETA AS is a private limited company (AS) in Bergen'), 'summary: at-a-glance line for a sparse profile');
+const aW3 = by(w3, '910000063');
+check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news' || c.field === 'careers_page'), 'website down: no false removals of site news, careers page or openings');
 
 // --- Website helpers --------------------------------------------------------------------
 check([...findOrgnrs('Org.nr. 810 034 882 MVA').keys()].join() === '810034882' && findOrgnrs('Ring 810034882').size === 0 && findOrgnrs('Oslo, Norge 810034882').size === 0, 'helpers: organisation numbers only counted where presented as such');

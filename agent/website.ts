@@ -591,6 +591,228 @@ export function siteContacts(verdict: SiteVerdict): { emails: { value: string; p
 // ---------------------------------------------------------------------------
 // The whole website step for one company
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Dated news and job openings on the verified site
+// ---------------------------------------------------------------------------
+const MONTHS: Record<string, number> = {
+  januar: 1, jan: 1, january: 1, februar: 2, feb: 2, february: 2, mars: 3, mar: 3, march: 3, april: 4, apr: 4,
+  mai: 5, may: 5, juni: 6, jun: 6, june: 6, juli: 7, jul: 7, july: 7, august: 8, aug: 8, september: 9, sep: 9,
+  sept: 9, oktober: 10, okt: 10, october: 10, oct: 10, november: 11, nov: 11, desember: 12, des: 12, december: 12, dec: 12,
+};
+const pad = (n: number) => String(n).padStart(2, '0');
+function ymd(y: number, m: number, d: number): string | null {
+  if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCMonth() === m - 1 ? `${y}-${pad(m)}-${pad(d)}` : null;
+}
+/** Parses ISO, Norwegian (12.10.2026, 12. oktober 2026) and English (October 12, 2026) dates. */
+export function parseDate(s: string): string | null {
+  const t = s.toLowerCase();
+  let m = t.match(/(20\d\d)-(\d\d)-(\d\d)/);
+  if (m) return ymd(+m[1], +m[2], +m[3]);
+  m = t.match(/(?<!\d)(\d{1,2})\.(\d{1,2})\.(20\d\d)(?!\d)/);
+  if (m) return ymd(+m[3], +m[2], +m[1]);
+  m = t.match(/(?<!\d)(\d{1,2})\.?\s+([a-zæøå]{3,9})\.?\s+(20\d\d)(?!\d)/);
+  if (m && MONTHS[m[2]]) return ymd(+m[3], MONTHS[m[2]], +m[1]);
+  m = t.match(/\b([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(20\d\d)(?!\d)/);
+  if (m && MONTHS[m[1]]) return ymd(+m[3], MONTHS[m[1]], +m[2]);
+  return null;
+}
+const DATE_TEXT = /(20\d\d-\d\d-\d\d)|(?<!\d)\d{1,2}\.\d{1,2}\.20\d\d(?!\d)|(?<!\d)\d{1,2}\.?\s+[a-zA-ZæøåÆØÅ]{3,9}\.?\s+20\d\d(?!\d)|\b[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+20\d\d/g;
+
+const NEWS_PATH = /\/(nyheter|nyhet|aktuelt|news|nytt|blogg|blog|presse|pressemeldinger|artikler|articles|insights|innsikt|siste-nytt)(\/|$)/i;
+const NEWS_TEXT = /^(nyheter|aktuelt|news|nytt|blogg|blog|presse|artikler|siste nytt|insights|innsikt)$/i;
+const CAREERS_PATH = /\/(karriere|karrierer|jobb|jobbe-hos-oss|jobb-hos-oss|ledige-stillinger|stillinger|careers?|jobs|work-with-us|join-us|bli-en-av-oss|rekruttering)(\/|$)/i;
+const CAREERS_TEXT = /^(karriere|jobb hos oss|jobbe hos oss|ledige stillinger|stillinger|careers?|jobs|jobb|bli en av oss|work with us|join us|rekruttering)$/i;
+const GENERIC_LINK = /^(les mer|les hele|se mer|mer|søk|søk her|søk nå|se stilling|se alle|vis alle|apply|apply now|read more|her|klikk her|ledige stillinger|karriere|jobb|nyheter|aktuelt|news|blogg|forrige|neste|next|previous)$/i;
+const JOB_HOSTS = /(^|\.)(teamtailor\.com|webcruiter\.(com|no)|jobbnorge\.no|finn\.no|arbeidsplassen\.nav\.no|recman\.(no|page)|hrmanager\.no|hr-manager\.net|jobylon\.com|reachmee\.com|easycruit\.com|simplyrecruit\.no|varbi\.com|talentech\.com|jobs\.lever\.co|boards\.greenhouse\.io|smartrecruiters\.com|workable\.com)$/i;
+const JOB_AD_HINT = /(\/jobs?\/[\w-]*\d|\/job\/|finnkode=|advertid=|\/stilling\/|\/ledige-stillinger\/stilling\/|\/vacanc|\/position|\/annonse|\/job-ad|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+
+export interface SiteNewsItem { date: string; title: string; url: string; snapshot: SourceSnapshot; via: string }
+export interface SiteJob { title: string; url: string; posted: string | null; expires: string | null; listed_on: string; snapshot: SourceSnapshot; via: string }
+export interface SiteActivity {
+  news: SiteNewsItem[];
+  newsPage: string | null;
+  newsChecked: boolean;
+  careersPage: { url: string; snapshot: SourceSnapshot } | null;
+  careersChecked: boolean;
+  jobs: SiteJob[];
+  snapshots: SourceSnapshot[];
+}
+
+const stripTags = (h: string) => decodeEntities(h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+
+function anchorsWithPos(html: string, base: string): { url: string; text: string; start: number; end: number; inner: string }[] {
+  const out: { url: string; text: string; start: number; end: number; inner: string }[] = [];
+  for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const href = attr(`<a ${m[1]}>`, 'href');
+    if (!href || /^(mailto|tel|javascript):/i.test(href) || href.startsWith('#')) continue;
+    try {
+      const u = new URL(href, base);
+      if (!/^https?:$/.test(u.protocol)) continue;
+      u.hash = '';
+      out.push({ url: u.href, text: stripTags(m[2]).slice(0, 300), start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, inner: m[2] });
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
+}
+
+function nearestDate(html: string, start: number, end: number): string | null {
+  // Stay inside the item the link belongs to: never cross the end of the previous list item or
+  // article, or the start of the next one.
+  const before = html.slice(Math.max(0, start - 600), start);
+  const cutL = Math.max(before.lastIndexOf('</article>'), before.lastIndexOf('</li>'), before.lastIndexOf('</tr>'));
+  const from = Math.max(0, start - 600) + (cutL >= 0 ? cutL : 0);
+  const after = html.slice(end, Math.min(html.length, end + 600));
+  const nexts = ['<article', '<li', '<tr'].map((t) => after.indexOf(t)).filter((i) => i >= 0);
+  const to = end + (nexts.length ? Math.min(...nexts) : after.length);
+  const win = html.slice(from, to);
+  const aS = start - from;
+  const aE = end - from;
+  let best: { d: string; dist: number } | null = null;
+  const consider = (raw: string, at: number) => {
+    const d = parseDate(raw);
+    if (!d) return;
+    const dist = at < aS ? aS - at : at > aE ? at - aE : 0;
+    if (!best || dist < best.dist) best = { d, dist };
+  };
+  for (const m of win.matchAll(/datetime\s*=\s*["']([^"']+)["']/gi)) consider(m[1], m.index ?? 0);
+  // Dates written in the text (tags blanked in place, so positions stay comparable).
+  const textOnly = win.replace(/<[^>]+>/g, (t) => ' '.repeat(t.length));
+  for (const m of textOnly.matchAll(DATE_TEXT)) consider(m[0], m.index ?? 0);
+  return (best as { d: string; dist: number } | null)?.d ?? null;
+}
+
+function articleNodes(html: string): { date: string; title: string; url: string | null }[] {
+  const out: { date: string; title: string; url: string | null }[] = [];
+  for (const n of jsonLdNodes(html)) {
+    const types = ([] as string[]).concat(n['@type'] || []).map(String);
+    if (!types.some((t) => /^(NewsArticle|BlogPosting|Article|Report|PressRelease)$/.test(t))) continue;
+    const date = typeof n.datePublished === 'string' ? parseDate(n.datePublished) : null;
+    const title = typeof n.headline === 'string' ? n.headline : typeof n.name === 'string' ? n.name : '';
+    const url = typeof n.url === 'string' ? n.url : typeof n.mainEntityOfPage === 'string' ? n.mainEntityOfPage : n.mainEntityOfPage?.['@id'] || null;
+    if (date && title) out.push({ date, title: decodeEntities(title).trim(), url });
+  }
+  return out;
+}
+
+function jobNodes(html: string): { title: string; posted: string | null; expires: string | null; url: string | null }[] {
+  const out: { title: string; posted: string | null; expires: string | null; url: string | null }[] = [];
+  for (const n of jsonLdNodes(html)) {
+    const types = ([] as string[]).concat(n['@type'] || []).map(String);
+    if (!types.includes('JobPosting') || typeof n.title !== 'string') continue;
+    out.push({
+      title: decodeEntities(n.title).trim(),
+      posted: typeof n.datePosted === 'string' ? parseDate(n.datePosted) : null,
+      expires: typeof n.validThrough === 'string' ? parseDate(n.validThrough) : null,
+      url: typeof n.url === 'string' ? n.url : null,
+    });
+  }
+  return out;
+}
+
+function findSectionLink(pages: PageAnalysis[], domain: string, path: RegExp, text: RegExp): string | null {
+  for (const p of pages)
+    for (const l of p.links) {
+      let u: URL;
+      try {
+        u = new URL(l.url);
+      } catch {
+        continue;
+      }
+      if (registrableDomain(u.hostname) !== domain) continue;
+      if (path.test(u.pathname) || text.test(l.text.trim())) return `${u.origin}${u.pathname}`;
+    }
+  return null;
+}
+
+/** Reads the verified site's news page and careers page (one request each, robots.txt honoured). */
+export async function readSiteActivity(
+  web: WebClient,
+  verdict: SiteVerdict,
+  since: string,
+  snapPrefix: string,
+  signal?: AbortSignal
+): Promise<SiteActivity> {
+  const act: SiteActivity = { news: [], newsPage: null, newsChecked: false, careersPage: null, careersChecked: false, jobs: [], snapshots: [] };
+  const domain = verdict.candidate.domain;
+  const today = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+  const sinceDay = since.slice(0, 10);
+
+  const newsUrl = findSectionLink(verdict.pages, domain, NEWS_PATH, NEWS_TEXT);
+  if (!newsUrl) act.newsChecked = true;
+  else if (!signal?.aborted) {
+    const r = await web.getPage(newsUrl, `${snapPrefix}:news`, signal);
+    act.snapshots.push(r.outcome === 'ok' ? r.page.snapshot : r.snapshot);
+    if (r.outcome === 'ok') {
+      act.newsChecked = true;
+      act.newsPage = r.page.url;
+      const listPath = new URL(r.page.url).pathname.replace(/\/$/, '');
+      const seen = new Set<string>();
+      const add = (date: string | null, title: string, url: string, via: string) => {
+        if (!date || date < sinceDay || date > today || seen.has(url)) return;
+        const t = title.replace(/\s+/g, ' ').trim();
+        if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t)) return;
+        seen.add(url);
+        act.news.push({ date, title: t, url, snapshot: r.page.snapshot, via });
+      };
+      for (const a of articleNodes(r.page.html)) add(a.date, a.title, a.url ? new URL(a.url, r.page.url).href : r.page.url, 'structured data');
+      for (const a of anchorsWithPos(r.page.html, r.page.url)) {
+        const u = new URL(a.url);
+        if (registrableDomain(u.hostname) !== domain) continue;
+        const path = u.pathname.replace(/\/$/, '');
+        if (path === listPath || !(path.startsWith(`${listPath}/`) || NEWS_PATH.test(u.pathname))) continue;
+        if (path.split('/').filter(Boolean).length < 2) continue;
+        const heading = a.inner.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+        add(nearestDate(r.page.html, a.start, a.end), heading ? stripTags(heading) : a.text, `${u.origin}${u.pathname}`, 'news page link');
+      }
+      act.news.sort((x, y) => y.date.localeCompare(x.date) || x.url.localeCompare(y.url));
+      act.news = act.news.slice(0, 10);
+    }
+  }
+
+  const careersUrl = findSectionLink(verdict.pages, domain, CAREERS_PATH, CAREERS_TEXT);
+  if (!careersUrl) act.careersChecked = true;
+  else if (!signal?.aborted) {
+    const r = await web.getPage(careersUrl, `${snapPrefix}:careers`, signal);
+    act.snapshots.push(r.outcome === 'ok' ? r.page.snapshot : r.snapshot);
+    if (r.outcome === 'ok') {
+      act.careersChecked = true;
+      act.careersPage = { url: r.page.url, snapshot: r.page.snapshot };
+      const careersPath = new URL(r.page.url).pathname.replace(/\/$/, '');
+      const seen = new Set<string>();
+      const now = new Date().toISOString().slice(0, 10);
+      for (const j of jobNodes(r.page.html)) {
+        if (j.expires && j.expires < now) continue;
+        const url = j.url ? new URL(j.url, r.page.url).href : r.page.url;
+        if (seen.has(url + j.title)) continue;
+        seen.add(url + j.title);
+        act.jobs.push({ title: j.title, url, posted: j.posted, expires: j.expires, listed_on: new URL(url).hostname, snapshot: r.page.snapshot, via: 'structured data JobPosting' });
+      }
+      for (const a of anchorsWithPos(r.page.html, r.page.url)) {
+        const u = new URL(a.url);
+        const title = a.text.replace(/\s+/g, ' ').trim();
+        if (title.length < 5 || title.length > 120 || GENERIC_LINK.test(title)) continue;
+        const external = JOB_HOSTS.test(u.hostname) && JOB_AD_HINT.test(u.pathname + u.search);
+        const own =
+          registrableDomain(u.hostname) === domain &&
+          careersPath.length > 1 &&
+          u.pathname.replace(/\/$/, '').startsWith(`${careersPath}/`) &&
+          u.pathname.replace(/\/$/, '') !== careersPath;
+        if (!external && !own) continue;
+        const url = `${u.origin}${u.pathname}${u.search}`;
+        if (seen.has(url)) continue;
+        seen.add(url);
+        act.jobs.push({ title, url, posted: null, expires: null, listed_on: u.hostname, snapshot: r.page.snapshot, via: external ? 'link to a job board ad' : 'link on the careers page' });
+      }
+      act.jobs = act.jobs.slice(0, 15);
+    }
+  }
+  return act;
+}
+
 export interface WebsiteOutcome {
   /** 'disabled' = the step did not run this time (switched off or public web unreachable). */
   state: 'verified' | 'none' | 'ambiguous' | 'blocked' | 'incomplete' | 'disabled';
@@ -598,13 +820,16 @@ export interface WebsiteOutcome {
   verified: SiteVerdict | null;
   registryVerdict: SiteVerdict | null;
   disabledReason?: string;
+  /** News and careers pages of the verified site. */
+  activity?: SiteActivity;
 }
 
-export async function findWebsite(web: WebClient | null | undefined, id: CompanyIdentity, budgetMs = 20_000): Promise<WebsiteOutcome> {
+export async function findWebsite(web: WebClient | null | undefined, id: CompanyIdentity, budgetMs = 20_000, since = '2025-01-01'): Promise<WebsiteOutcome> {
   if (!web || web.disabled) return { state: 'disabled', verdicts: [], verified: null, registryVerdict: null, disabledReason: web?.disabledReason || 'website_step_disabled' };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), budgetMs);
   const verdicts: SiteVerdict[] = [];
+  let activity: SiteActivity | undefined;
   try {
     for (const cand of candidatesFor(id)) {
       if (ctrl.signal.aborted) {
@@ -616,6 +841,8 @@ export async function findWebsite(web: WebClient | null | undefined, id: Company
       if (verdict.status === 'exact') break;
       if (web.disabled) break;
     }
+    const v = verdicts.find((x) => x.status === 'exact');
+    if (v && !ctrl.signal.aborted) activity = await readSiteActivity(web, v, since, `snap:${id.orgnr}:web:${v.candidate.domain}`, ctrl.signal);
   } finally {
     clearTimeout(timer);
   }
@@ -628,5 +855,5 @@ export async function findWebsite(web: WebClient | null | undefined, id: Company
   else if (verdicts.some((x) => x.status === 'error')) state = 'incomplete';
   else if (verdicts.length && verdicts.every((x) => x.status === 'blocked')) state = 'blocked';
   else state = 'none';
-  return { state, verdicts, verified, registryVerdict, ...(state === 'disabled' ? { disabledReason: web.disabledReason || 'public_web_unreachable' } : {}) };
+  return { state, verdicts, verified, registryVerdict, activity, ...(state === 'disabled' ? { disabledReason: web.disabledReason || 'public_web_unreachable' } : {}) };
 }

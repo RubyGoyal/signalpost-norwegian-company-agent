@@ -1,6 +1,6 @@
 {
   "name": "Signalpost — Norwegian Company Intelligence Agent",
-  "description": "Signalpost agent: reads official Norwegian registers (Brønnøysundregistrene) for an organisation number and publishes facts with source links, retrieval times and reporting periods. No AI model, no API keys.",
+  "description": "Signalpost agent: for a Norwegian organisation number, reads the official Brønnøysund registers, NAV's job vacancy feed and the company's own verified website, and publishes facts with source links, retrieval times and reporting periods. No AI model, no API keys.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
