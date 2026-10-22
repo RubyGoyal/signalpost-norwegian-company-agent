@@ -5,17 +5,27 @@
   "registry_research": {
     "commit": "af2952f42ab1a0c07b9847b21af07852facaa111",
     "envelope_count": 1000,
-    "states": { "available": 1000 },
+    "states": {
+      "available": 1000
+    },
     "integrity_issues": 0,
     "total_claims": 60016,
     "requests": 5003,
     "runtime_seconds": 183,
-    "per_company_runtime_ms": { "p50": 5618, "p95": 7818 },
+    "per_company_runtime_ms": {
+      "p50": 5618,
+      "p95": 7818
+    },
     "registered_websites": 108,
     "registered_social_page_published_as_profile": 1,
     "companies_with_email_domain_candidate": 113,
     "companies_with_name_domain_candidates": 880,
-    "re_run": { "changes_detected": 0, "companies_with_different_claim_ids": 0, "top_level_changes": 0, "runtime_seconds": 181 }
+    "re_run": {
+      "changes_detected": 0,
+      "companies_with_different_claim_ids": 0,
+      "top_level_changes": 0,
+      "runtime_seconds": 181
+    }
   },
   "hiring_by_organisation_number": {
     "commit": "af2952f42ab1a0c07b9847b21af07852facaa111",
@@ -28,7 +38,10 @@
     "index_seconds_in_browser": 337,
     "companies_with_active_ads": 3,
     "active_ads_attached": 5,
-    "previous_version": { "companies_with_active_ads": 1, "active_ads_attached": 1 },
+    "previous_version": {
+      "companies_with_active_ads": 1,
+      "active_ads_attached": 1
+    },
     "found_now": [
       "925036226 HUMAN CARE UNG AS: 3 ads posted by its sub-units under the brand name 'Humana omsorg og assistanse'",
       "931723499 SOLBYEN MAKI HOUSE AS: 1 ad posted by its sub-unit under the brand name 'SushiTake Meny Sarpsborg'",
@@ -39,14 +52,103 @@
     "commit": "83a9da155f8432c58fe238c8c739f79f3178c81f",
     "checked": 7,
     "results": [
-      { "company": "980894002", "candidate": "registered website", "result": "not published: placeholder page ('Coming Soon')" },
-      { "company": "924291370", "candidate": "registered website", "result": "verified by the company name on the homepage", "contact_links": "phone" },
-      { "company": "953079798", "candidate": "registered website", "result": "verified by the full legal name in the page footer" },
-      { "company": "974456923", "candidate": "registered website", "result": "verified by the organisation number on the site", "profiles": ["https://facebook.com/FlexiformAS", "https://instagram.com/flexiform.no", "https://linkedin.com/company/flexiform-as"], "contact_links": "email and phone" },
-      { "company": "971177470", "candidate": "registered email domain (no website registered)", "result": "verified by the full legal name on the page", "contact_links": "email" },
-      { "company": "971000341", "candidate": "registered email domain (no website registered)", "result": "verified by the company name on the homepage", "contact_links": "email and two phone numbers" },
-      { "company": "953452626", "candidate": "registered email domain coop.no", "result": "not published: the site is the Coop group's, not this entity's" }
+      {
+        "company": "980894002",
+        "candidate": "registered website",
+        "result": "not published: placeholder page ('Coming Soon')"
+      },
+      {
+        "company": "924291370",
+        "candidate": "registered website",
+        "result": "verified by the company name on the homepage",
+        "contact_links": "phone"
+      },
+      {
+        "company": "953079798",
+        "candidate": "registered website",
+        "result": "verified by the full legal name in the page footer"
+      },
+      {
+        "company": "974456923",
+        "candidate": "registered website",
+        "result": "verified by the organisation number on the site",
+        "profiles": [
+          "https://facebook.com/FlexiformAS",
+          "https://instagram.com/flexiform.no",
+          "https://linkedin.com/company/flexiform-as"
+        ],
+        "contact_links": "email and phone"
+      },
+      {
+        "company": "971177470",
+        "candidate": "registered email domain (no website registered)",
+        "result": "verified by the full legal name on the page",
+        "contact_links": "email"
+      },
+      {
+        "company": "971000341",
+        "candidate": "registered email domain (no website registered)",
+        "result": "verified by the company name on the homepage",
+        "contact_links": "email and two phone numbers"
+      },
+      {
+        "company": "953452626",
+        "candidate": "registered email domain coop.no",
+        "result": "not published: the site is the Coop group's, not this entity's"
+      }
     ],
     "note": "Two of these sites (953079798, 971177470) were not verified by the first version of the check; reading the full legal name in the page text fixed both, without letting group sites through."
+  },
+  "website_news_and_careers_on_real_sites": {
+    "commit": "8e0f5227ade9c40273a8d9e87e5bd88223fa5b4d",
+    "checked": 5,
+    "results": [
+      {
+        "company": "977023637 CERTEGO AS",
+        "website": "verified by the company name on the homepage",
+        "news": "10 dated items since 2025 from its news page (newest 2026-08-19)",
+        "careers_page": "found",
+        "openings": "none listed as job-board ads or structured data",
+        "profiles": [
+          "https://facebook.com/certegonorge",
+          "https://linkedin.com/company/certego-norge"
+        ]
+      },
+      {
+        "company": "995884070 BRUNVOLL AS",
+        "website": "verified by the company name on the homepage",
+        "news": "1 dated item",
+        "careers_page": "found",
+        "profiles": [
+          "https://facebook.com/brunvoll.no",
+          "https://linkedin.com/company/brunvoll-as",
+          "https://youtube.com/@brunvoll6021"
+        ]
+      },
+      {
+        "company": "974353547 CHRISTIE NORDANG AS",
+        "website": "verified by the organisation number (the registered website redirects to christienordang.no)",
+        "news": "press page found, no dated items",
+        "careers_page": "found",
+        "profiles": [
+          "https://facebook.com/christienordang",
+          "https://linkedin.com/company/christie-nordang-as"
+        ]
+      },
+      {
+        "company": "974456923 FLEXIFORM AS",
+        "website": "verified by the organisation number",
+        "news": "no news page",
+        "careers_page": "none"
+      },
+      {
+        "company": "989728504 CLEMENS KRAFT HOLDING AS",
+        "website": "not verified: the registered site shows the operating company's organisation number (912511480), so it is kept only as the registered website"
+      }
+    ],
+    "fixes_from_this_check": [
+      "Pages under a careers section ('We are Brunvoll', 'Lærling i CERTEGO') were counted as openings; openings now come only from links to individual job-board ads and current JobPosting data.",
+      "A news article link was taken as the news page; the section's own index page is now preferred."
+    ]
   }
 }

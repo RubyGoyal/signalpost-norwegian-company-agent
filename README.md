@@ -139,6 +139,7 @@ npm run check:signalpost-challenge    # live run on 10 well-known companies (exa
   - Five were verified: by organisation number, by the company name on the homepage, or by the full legal name in the footer.
   - A "Coming Soon" placeholder and a group brand site (coop.no for a Coop entity) were correctly not published.
   - The verified site that has profile links yielded its Facebook, Instagram and LinkedIn pages.
+- **Website news and careers pages:** the check was run on five more real sites. CERTEGO's news page gave 10 dated items since 2025, and three sites gave their careers page and their LinkedIn, Facebook and YouTube pages. A holding company whose registered site shows its operating company's number was not verified. Two problems this check found were fixed: pages about working at the company were counted as openings, and an article was read as the news page.
 - **Candidates in the sample:** 108 companies register a website. Another 113 can be checked through their registered email domain, and 880 through domains spelled from their name.
 
 Details are in [`examples/live-test-v3-report.json`](examples/live-test-v3-report.json).
