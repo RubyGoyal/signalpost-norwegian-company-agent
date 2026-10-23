@@ -1,0 +1,80 @@
+{
+  "description": "Live check of the website rules changed after Builderr's audit of version 3, on every website registered in Enhetsregisteret for the 1,000 companies of examples/smoke-1000.txt (drawn at random from Builderr's official company list).",
+  "run_date": "2026-10-23",
+  "commit_tested": "98350c5bf05027ff00881bc888fcbabc6df1de36",
+  "how_it_was_run": "agent/website.ts, agent/web.ts and agent/orgnr.ts were downloaded from GitHub at the tested commit, checked by SHA-256 and run in a browser tab on each company's own site (a browser page can read only its own site). Each company's identity came from Enhetsregisteret. The agent's own functions decided: verifyCandidate (is this the company's own site), profilesFrom (social accounts), readSiteActivity (news posts, job ads) and siteContacts. robots.txt was honoured. Seven sites block scripts from other hosts; for those, the homepage and its contact, about and terms pages were searched for the company's organisation number and name instead.",
+  "registered_websites": 108,
+  "version_3_behaviour": "All 107 registered addresses that were not a social profile were published as the company's website (a placeholder page was dropped), including group, manager, chain and brand sites.",
+  "results": {
+    "verified_as_the_companys_own_site": 47,
+    "kept_as_registered_but_unreadable": 1,
+    "not_published_group_parent_manager_chain_or_brand_site": 31,
+    "not_published_other": 9,
+    "registered_social_profile_published_as_profile": 1,
+    "not_tested": 19
+  },
+  "not_published_group_parent_manager_chain_or_brand_site": [
+    "985010110 BJØRVIKA INFRASTRUKTUR AS: bjorvikautvikling.no is the parent's site and names several companies",
+    "918786651 BONDENS MARKED VESTFOLD SA: bondensmarked.no is the national organisation's site",
+    "989728504 CLEMENS KRAFT HOLDING AS: clemenskraft.no shows the operating company's organisation number",
+    "928878090 BEWI PACKAGING NORWAY AS: bewisynbra.com redirects to the group site bewi.com, which does not name this company",
+    "990936277 BORETTSLAGET ERVIKVEIEN 33-35: accountor.no is the accounting firm's site",
+    "991335080 STIFTELSE TIL ANDERS LÖFGRENS MINNE: unifor.no is the foundation manager's site (another organisation number)",
+    "990626170 DÆLENENGGATEN 20 AS: ragde.no is the parent Ragde Eiendom's site",
+    "890673562 KAPELLVEIEN 2 AS: newsec.no is the property manager's site",
+    "918061932 QVIST-KORSMO AS: bakerhansen.no is the franchisor's site (another organisation number)",
+    "993950602 TOMASJORDNES VELFORENING: agioforvaltning.no is the manager's site",
+    "952825984 VIKINGVEIEN BORETTSLAG: labo.no is the housing association's site",
+    "989498223 HAUGOMGATA 17-19 AS: norgesgruppeneiendom.no is the parent's site",
+    "985187193 SWISSPEARL NORGE AS: cembrit.no redirects to the international group site swisspearl.com",
+    "955206517 VÆRINGKLEIVA BORETTSLAG: usbl.no (housing association, another organisation number)",
+    "929371437 SAMEIET BONDELIA PARK: usbl.no",
+    "918901191 SAMEIET YTREBYGDSVEIEN 68-70: vestbo.no",
+    "951195340 BORETTSLAGET TJENSÅS IV: bate.no",
+    "990289468 BRÅTHEIA BORETTSLAG: kragero-bbl.no",
+    "928150402 THORN NORGE AS: thorn.no shows a sister company's organisation numbers",
+    "987897007 VANSJØ VEST BOLIGSAMEIE: vbbl.no",
+    "996063100 BOLIGSAMEIET SOLSTADTUNET: vbbl.no",
+    "989746944 ADVOKAT LENE FRYKMAN AS: frykmankramer.no redirects to another law firm's site",
+    "814565602 BRAGERNES PARKERING AS: ava.no is the parent AVA Eiendom's site",
+    "931561693 DELTA WINES NORWAY AS: nbgroup.no is the group's site",
+    "914309786 EIDSBOTN BORETTSLAG: bomidt.no",
+    "919726075 CITY DANMARK AS: erlaeiendom.no is the parent's site",
+    "831407522 TNA-HOLDING AS: tnark.no is the operating company's site",
+    "996860590 HOLMLIA BUTIKKDRIFT AS: rema.no shows REMA 1000's organisation number (checked by search)",
+    "952264095 ILA BORETTSLAG: obos.no names neither the company nor its number (checked by search)",
+    "955360818 BORETTSLAGET NØRVEGATA 10 AL: obos.no (checked by search)",
+    "955351924 BL STEINVÅGVEIEN 21 AL: obos.no (checked by search)"
+  ],
+  "not_published_other": [
+    "897851512 VTBG AS: veloshop.no is a closed shop (password page)",
+    "991500839 FISKÅ MØLLE FLISA AS: flisamolle.no is an empty page",
+    "999065902 EARTHREND MEDIA AS: earthrend.com redirects to an unrelated site",
+    "912127540 ERLAND HØISTAD AS: hoistad.no redirects to a hosting company's parking page",
+    "923215646 VIKSE FINANS AS: viksefinans.no answers 404 (domain not connected)",
+    "931926829 NOWWELL FLOW TECHNOLOGY AS: nowwell.com shows neither the name nor the organisation number",
+    "943719721 MILJØTEKNIKK TERRATEAM AS: terrateam.no shows neither the name nor the organisation number",
+    "963796722 IDEVERKSTEDET AS: missed (thin homepage); fixed in this version",
+    "983807801 PERSONALTJENESTER TELEMARK AS: missed (name only in the whole title); fixed in this version"
+  ],
+  "verified_examples": [
+    "974456923 FLEXIFORM AS: organisation number; profiles facebook.com/FlexiformAS, instagram.com/flexiform.no, linkedin.com/company/flexiform-as",
+    "875758632 IDRETTSFORENINGEN FLØYA: organisation number; 5 dated posts from its news page (2025-01-23 to 2026-10-07)",
+    "961847818 OSLO RØDE KORS: its own page on the national site (rodekors.no/oslo), verified as that page; the national Red Cross accounts, news and jobs not used",
+    "923971025 HAPRO AS: the homepage names Hapro AS; its subsidiaries are listed on the site",
+    "985550999 BARNEKREFTFORENINGEN: organisation number; four profiles named after it",
+    "919534028 BERIGO AS, 818711832 LUFTAMBULANSETJENESTEN HF, 920415040 FAGSKOLEN DIAKONOVA AS, 998484308 TANNPLEIER LAILA KOLPUS AS: organisation number on the site (checked by search)"
+  ],
+  "kept_as_registered_but_unreadable": [
+    "980894002 SKARSNUTEN EIENDOM AS: robots.txt disallows reading; the domain carries the company name"
+  ],
+  "not_tested": "19 sites: 18 did not load in the browser pane, one serves plain http only (the test needs https).",
+  "fixed_after_this_check": [
+    "Own sites missed: a title that names the company only as a whole, and a thin homepage of a one-word company on its own name domain.",
+    "Profiles: an account named after the company's own verified domain (agropumper.no, innergammelsetra.no, floya.no) is its brand, unless another company on the site has that name (a parent Treteam AS on treteam.no). Small words of the legal name ('for', 'av') are allowed in a handle.",
+    "Contacts: only role addresses (post@, salg@, kundeservice@ ...) and the site's main phone number; staff members' own addresses and phones were being published (e.g. first names and initials).",
+    "Job ads on recruiting platforms without structured data (Jobylon): the ad counts when its title names this company as the employer and it is not closed. Homely's three Jobylon ads were missed before.",
+    "A front page that redirects deeper on the same site (a shop's /password page, a CMS start page) is no longer treated as a page on someone else's site.",
+    "A 'News' link back to the front page is not read as the news page."
+  ]
+}

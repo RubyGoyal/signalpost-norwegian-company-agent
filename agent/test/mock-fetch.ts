@@ -30,6 +30,10 @@ const Q = '910000942'; // registered website is a brand site showing neither the
 const R = '910000950'; // registered website is this company's page on the group's site (a path)
 const S = '910000977'; // registered website refuses automated readers (HTTP 403); its domain carries the name → kept
 const T = '910000985'; // registered website refuses automated readers; a chain-style domain without the name → not kept
+// From the live check of version 4 on real sites:
+const V = '910000993'; // the full title names the company only as a whole ("Bemanning | Sigma Personal | Telemark & Agder")
+const W = '910001000'; // single-word name, thin homepage named after the company on its own domain
+const X = '910001019'; // the front page redirects to a deep page on the same site: still the company's own site
 
 const env: Record<string, string | undefined> = (globalThis as any).process?.env ?? {};
 const mutate = env.MOCK_MUTATE === '1';
@@ -110,6 +114,9 @@ const entities: Record<string, unknown> = {
       [R, 'TAU BYGG AS', { hjemmeside: 'www.tau-gruppen.no/selskaper/tau-bygg' }],
       [S, 'TESTSELSKAP OMEGA AS', { hjemmeside: 'www.omega-test.no' }],
       [T, 'TESTSELSKAP PSI AS', { hjemmeside: 'www.butikkjeden.no' }],
+      [V, 'SIGMA PERSONAL TELEMARK AS', { hjemmeside: 'www.sigmapersonal.no' }],
+      [W, 'IDEHUSET AS', { hjemmeside: 'www.idehuset.no' }],
+      [X, 'TESTSELSKAP XI AS', { hjemmeside: 'www.xi-test.no' }],
     ] as [string, string, Record<string, string>][]).map(([o, navn, extra]) => [
       o,
       {
@@ -316,6 +323,9 @@ const DNS: Record<string, string> = {
   'alphatest.teamtailor.com': PUBLIC_IP,
   'www.omega-test.no': PUBLIC_IP,
   'www.butikkjeden.no': PUBLIC_IP,
+  'www.sigmapersonal.no': PUBLIC_IP,
+  'www.idehuset.no': PUBLIC_IP,
+  'www.xi-test.no': PUBLIC_IP,
 };
 (globalThis as any).__SIGNALPOST_DNS__ = async (host: string) => {
   if (noWeb || !DNS[host]) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
@@ -336,7 +346,7 @@ const WEB: Record<string, Site> = {
          <p>Vi lager programvare for norske bedrifter.</p>
          <footer>Testselskap Alpha AS &middot; Org.nr 910&nbsp;000&nbsp;063 MVA &middot;
          <a href="mailto:salg@alpha-test.no">salg@alpha-test.no</a> <a href="mailto:post@alpha-test.no">post</a>
-         <a href="tel:+4722334455">22 33 44 55</a>
+         <a href="tel:+4722334455">22 33 44 55</a> <a href="mailto:ola.nordmann@alpha-test.no">Ola Nordmann</a> <a href="tel:+4791234567">Ola: 912 34 567</a>
          <a href="https://www.facebook.com/testselskapalpha">Facebook</a>
          <a href="https://www.instagram.com/testselskap_alpha_as/">Instagram</a>
          <a href="https://www.facebook.com/alphagruppen">Alpha-gruppen</a>
@@ -370,6 +380,9 @@ const WEB: Record<string, Site> = {
         `<h1>Jobb hos oss</h1>
          <ul><li><a href="https://alphatest.teamtailor.com/jobs/123456-backend-utvikler">Backend-utvikler</a></li>
          <li><a href="https://alphatest.teamtailor.com/jobs/223344-regnskapsforer">Regnskapsfører (Alpha Eiendom)</a></li>
+         <li><a href="https://alphatest.teamtailor.com/jobs/345678-designer">Designer</a></li>
+         <li><a href="https://alphatest.teamtailor.com/jobs/456789-selger">Selger</a></li>
+         <li><a href="https://alphatest.teamtailor.com/jobs/567890-lagerarbeider">Lagerarbeider</a></li>
          <li><a href="https://www.finn.no/job/fulltime/search.html?orgId=12345">Se våre stillinger på FINN</a></li>
          <li><a href="https://arbeidsplassen.nav.no/stillinger?q=testselskap%20alpha">Ledige stillinger hos NAV</a></li>
          <li><a href="https://arbeidsplassen.nav.no/stillinger/stilling/11111111-1111-4111-8111-111111111111">Senior utvikler (NAV)</a></li>
@@ -458,6 +471,21 @@ Object.assign(WEB, {
       '/karriere': page('Karriere', '<script type="application/ld+json">{"@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","hiringOrganization":{"name":"Tau Gruppen AS"}}</script>'),
     },
   },
+  'www.sigmapersonal.no': {
+    pages: {
+      '/': page(
+        'Bemanning & Rekruttering | Sigma Personal | Telemark & Agder',
+        '<p>Vi leverer bemanning og rekruttering til bedrifter i Telemark og Agder. Ta kontakt med oss for en uforpliktende prat om hvordan vi kan hjelpe din bedrift med riktig kompetanse, raskt og trygt.</p>'
+      ),
+    },
+  },
+  'www.idehuset.no': { pages: { '/': page('Idehuset - Home', '<p>Velkommen.</p>') } },
+  'www.xi-test.no': {
+    pages: {
+      '/': { redirect: 'https://www.xi-test.no/no/forside/velkommen' },
+      '/no/forside/velkommen': page('Velkommen', '<footer>Testselskap Xi AS &middot; Org.nr 910 001 019 <a href="mailto:post@xi-test.no">post@xi-test.no</a></footer>'),
+    },
+  },
   'alphatest.teamtailor.com': {
     robots: 'User-agent: *\nAllow: /\n',
     pages: {
@@ -466,6 +494,9 @@ Object.assign(WEB, {
         '<h1>Backend-utvikler</h1>',
         '<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Backend-utvikler","datePosted":"2026-10-03","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}}</script>'
       ),
+      '/jobs/345678-designer': page('Designer - Testselskap Alpha | Teamtailor', '<h1>Designer</h1><p>Vi søker en designer.</p>'),
+      '/jobs/456789-selger': page('Selger - Alpha Eiendom | Teamtailor', '<h1>Selger</h1>'),
+      '/jobs/567890-lagerarbeider': page('Lagerarbeider - Testselskap Alpha | Teamtailor', '<h1>Lagerarbeider</h1><p>Stillingen er ikke lenger aktiv.</p>'),
       '/jobs/223344-regnskapsforer': page(
         'Regnskapsfører – Alpha Eiendom',
         '<h1>Regnskapsfører</h1>',

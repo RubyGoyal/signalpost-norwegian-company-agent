@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseInputText } from '../input.ts';
 import { checkUrlShape, isPublicAddress, parseRobots, robotsAllows } from '../web.ts';
-import { findOrgnrs, handleMatchesName, normalizeSocial, otherEntities, publishedDate, sameCompanyName } from '../website.ts';
+import { findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, publishedDate, sameCompanyName } from '../website.ts';
 import type { Envelope } from '../types.ts';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
@@ -149,7 +149,7 @@ check(r6.length === 3 && by(r6, '91000006')?.errors[0]?.code === 'invalid_organi
 
 // --- Company websites: verification, profiles, contact links ------------------------------
 const webIn = path.join(work, 'web.csv');
-writeFileSync(webIn, ['orgnr', '910000063', '910000098', '910000802', '910000810', '910000829', '910000837', '910000845', '910000721', '910000888', '910000896', '910000918', '910000926', '910000942', '910000950', '910000977', '910000985'].join('\n'));
+writeFileSync(webIn, ['orgnr', '910000063', '910000098', '910000802', '910000810', '910000829', '910000837', '910000845', '910000721', '910000888', '910000896', '910000918', '910000926', '910000942', '910000950', '910000977', '910000985', '910000993', '910001000', '910001019'].join('\n'));
 const wsState = path.join(work, 'web-state');
 const wrun = (name: string, env: Record<string, string> = {}) => {
   const out = path.join(work, name);
@@ -164,9 +164,10 @@ check(wa('910000063').official_website.reason === 'registered_and_verified_on_si
 const aSiteEv = by(w1, '910000063').evidence.find((e) => e.source_url === 'https://www.alpha-test.no/' && e.claim_span.includes('910 000 063'));
 check(!!aSiteEv && aSiteEv.source_class === 'company_owned' && !!aSiteEv.content_sha256, 'website: evidence quotes the site text with the organisation number, hashed');
 const prof = wc('910000063', 'social_profile').map((c) => (c.value as any).url).sort();
-check(prof.join() === 'https://facebook.com/testselskapalpha,https://instagram.com/testselskap_alpha_as', `profiles: only accounts whose handle is the company's name; parent group, sister company, web agency, theme, share link and a brand handle left out (got ${prof})`);
+check(prof.join() === 'https://facebook.com/testselskapalpha,https://instagram.com/testselskap_alpha_as,https://linkedin.com/company/alpha-test', `profiles: accounts named after the company or its own verified domain; parent group, sister company, web agency, theme and share link left out (got ${prof})`);
 check(wc('910000063', 'email').map((c) => c.value).sort().join() === 'post@alpha-test.no,salg@alpha-test.no' && !JSON.stringify(by(w1, '910000063').claims).includes('webbyraa.no'), 'contacts: site email on its own domain added; other-domain email excluded; registered email not duplicated');
-check(wc('910000063', 'phone').some((c) => c.value === '+47 22334455'), 'contacts: phone link on the verified site added');
+check(!JSON.stringify(by(w1, '910000063').claims).includes('ola.nordmann') && !JSON.stringify(by(w1, '910000063').claims).includes('91234567'), "contacts: a staff member's own email and phone are not published (role addresses and the main number only)");
+check(wc('910000063', 'phone').map((c) => c.value).join() === '+47 22334455', 'contacts: the main phone number on the verified site added');
 const bSite = wc('910000098', 'website')[0];
 check((bSite?.value as any)?.url === 'https://testselskap-beta.no/' && (bSite?.value as any)?.found_via === 'name_domain_check', 'website: name-spelled domain verified by name plus registered address');
 check(!JSON.stringify(by(w1, '910000098').claims).includes('testselskapbeta.no'), 'website: namesake site showing another organisation number rejected');
@@ -195,7 +196,7 @@ const newsA = aW.claims.filter((c) => c.field === 'site_news').map((c) => `${(c.
 check(newsA.join('|') === '2025-03-03 Vi flytter til nye lokaler|2026-06-01 Alpha lanserer ny plattform|2026-08-10 Ny styreleder valgt|2026-09-05 Vi åpner kontor i Tromsø|2026-09-15 Ny avtale med Bergen kommune', `site news: dated posts only, publish date not "updated" date; menu labels, archive, product pages, the listing's own data, modified-only dates and a neighbour's date left out (got ${newsA.join('|')})`);
 check(aW.claims.filter((c) => c.field === 'site_news').every((c) => c.source_date && c.family === 'public_activity'), 'site news: each item is dated public activity');
 const jobsA = aW.claims.filter((c) => c.field === 'site_job').map((c) => (c.value as any).title).sort();
-check(jobsA.join('|') === 'Backend-utvikler|Driftstekniker|Prosjektleder', `jobs: single ads whose hiring organisation is this company (by name or organisation number); sister company's ad, parent's posting, posting without employer, posting without its own ad page, FINN and NAV searches, expired data and the site's own pages left out (got ${jobsA.join('|')})`);
+check(jobsA.join('|') === 'Backend-utvikler|Designer|Driftstekniker|Prosjektleder', `jobs: single ads whose hiring organisation is this company (by name or organisation number); sister company's ad, parent's posting, posting without employer, posting without its own ad page, FINN and NAV searches, expired data and the site's own pages left out (got ${jobsA.join('|')})`);
 check(aW.claims.filter((c) => c.field === 'site_job').every((c) => (c.value as any).hiring_organisation && /^https:\/\/(alphatest\.teamtailor\.com\/jobs\/\d+-|www\.alpha-test\.no\/karriere\/.+)/.test((c.value as any).url)), 'jobs: each ad names its hiring organisation and points to the single ad, never to the careers landing page');
 check(!aW.claims.some((c) => c.field === 'site_job' && String((c.value as any).url).includes('11111111-1111')), 'careers page: a link to a NAV ad already attached is not counted twice');
 check(!aW.claims.some((c) => c.field === 'careers_page') && !aW.summary.text.includes('careers page') && aW.availability.job_postings.checked_sources.includes('company_website'), 'jobs: a careers landing page is not published as a job; the website is recorded as checked');
@@ -212,6 +213,9 @@ check(by(w1, '910000942').summary.text.includes("the registered site shows neith
 const tauSite = wc('910000950', 'website')[0];
 check((tauSite?.value as any)?.url === 'https://www.tau-gruppen.no/selskaper/tau-bygg' && tauSite.evidence_ids.length === 2 && wa('910000950').official_website.state === 'available', "audit: this company's page on the group's site verified by its org number and name; published as that page");
 check(wc('910000950', 'social_profile').map((c) => (c.value as any).url).join() === 'https://facebook.com/taubygg' && !wc('910000950', 'site_news').length && !wc('910000950', 'site_job').length && !by(w1, '910000950').claims.some((c) => c.key.includes('#website#')), "audit: on a page of the group's site only the company's own account is used; the group's news, jobs and email are not");
+check((wc('910000993', 'website')[0]?.value as any)?.url && wa('910000993').official_website.state === 'available', 'live check: a title that names the company only as a whole ("Bemanning | Sigma Personal | Telemark & Agder") verifies the site');
+check(wa('910001000').official_website.state === 'available' && wc('910001000', 'website')[0]?.evidence_ids.length === 2, 'live check: a thin homepage named after a one-word company on its own name domain is verified');
+check(wa('910001019').official_website.state === 'available' && wc('910001019', 'email').some((c) => c.value === 'post@xi-test.no'), 'live check: a front page that redirects deeper on the same site is still the whole site (its contacts are used)');
 check(wc('910000977', 'website')[0]?.confidence === 0.8 && wa('910000977').official_website.state === 'available' && wa('910000985').official_website.state === 'blocked' && !wc('910000985', 'website').length, 'audit: a registered site behind bot protection is kept only when its domain carries the company name');
 check(!wc('910000896', 'site_news').length && wa('910000896').official_website.state === 'available', 'audit: a web shop\'s "Nyheter" (new products) is not read as news');
 const aW3 = by(w3, '910000063');
@@ -224,6 +228,9 @@ check(['brunvoll6021|BRUNVOLL AS', 'certego-norge|CERTEGO AS', 'FlexiformAS|FLEX
 check(!['kappagruppen|KAPPA BYGG AS', 'kappa|KAPPA BYGG AS', 'nordicgroup|NORDIC AS', 'nordicwebagency|NORDIC AS', 'webbyraa|TESTSELSKAP ALPHA AS', 'alpha-test|TESTSELSKAP ALPHA AS', 'testselskap-alpha-eiendom|TESTSELSKAP ALPHA AS'].some((x) => handleMatchesName(x.split('|')[0], x.split('|')[1])), 'helpers: parent group, sister company, agency and brand handles rejected');
 check(publishedDate('<p>Publisert 05.09.2026 · Oppdatert 01.10.2026</p>') === '2026-09-05' && publishedDate('<time class="updated" datetime="2026-10-15">15.10.2026</time>') === null && publishedDate('<p>Sist endret 3. mars 2026</p>') === null && publishedDate('<time datetime="2026-02-01">1. feb</time>') === '2026-02-01', 'helpers: publish date read; updated or modified dates ignored');
 check(otherEntities([{ title: 'Kappa Gruppen', text: 'Kappa Gruppen består av Kappa Bygg AS, Kappa Elektro AS og Kappa Eiendom AS.\n© Kappa Gruppen AS' }], 'KAPPA BYGG AS').length === 3 && otherEntities([{ title: 'Iota', text: 'Copyright © 2026 Iota Handel og Service AS – alle rettigheter reservert' }], 'IOTA HANDEL OG SERVICE AS').length === 0, 'helpers: other companies named on a page counted (the company itself not)');
+const brandVerdict = (title: string, text: string, scoped = false) => ({ status: 'exact', scoped, candidate: { domain: 'treteam.no' }, pages: [{ title, text, links: [], sameAs: [] }] }) as any;
+check(handleIsSiteBrand('treteam', brandVerdict('Tre Team', 'Tre Team Entreprenør AS bygger hus.'), 'TRE TEAM ENTREPRENØR AS') && !handleIsSiteBrand('treteam', brandVerdict('Tre Team', 'Tre Team Entreprenør AS er eid av Treteam AS.'), 'TRE TEAM ENTREPRENØR AS') && !handleIsSiteBrand('treteam', brandVerdict('Tre Team', 'Tre Team Entreprenør AS', true), 'TRE TEAM ENTREPRENØR AS'), "helpers: a handle equal to the company's own domain is its brand, unless another company on the site has that name or the site is someone else's");
+check(handleMatchesName('fod-foreningen-for-omplassering-av-dyr', 'FORENINGEN FOR OMPLASSERING AV DYR FOD'), 'helpers: small words of the legal name ("for", "av") allowed in a handle');
 check(sameCompanyName('Testselskap Alpha', 'TESTSELSKAP ALPHA AS') && sameCompanyName('Certego Norge AS', 'CERTEGO AS') && !sameCompanyName('Alpha Gruppen AS', 'TESTSELSKAP ALPHA AS') && !sameCompanyName('Kappa Gruppen AS', 'KAPPA AS'), 'helpers: hiring organisation matched to the legal name; parent group not');
 check(!robotsAllows(parseRobots('User-agent: *\nDisallow: /admin\nAllow: /admin/public'), '/admin/x') && robotsAllows(parseRobots('User-agent: *\nDisallow: /admin\nAllow: /admin/public'), '/admin/public/a'), 'helpers: robots.txt longest-match rules');
 check(!isPublicAddress('169.254.169.254') && !isPublicAddress('10.0.0.5') && !isPublicAddress('::1') && !isPublicAddress('::ffff:192.168.1.1') && isPublicAddress('185.70.10.1'), 'helpers: private, link-local and loopback addresses blocked');

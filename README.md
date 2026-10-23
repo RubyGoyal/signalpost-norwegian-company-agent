@@ -65,7 +65,7 @@ Optional flags and environment variables:
 - Annual accounts: revenue, operating profit, profit before tax, annual result, assets, equity, liabilities, audited flag, latest filed year
 - **Official website:** the company's own website: the one registered in Enhetsregisteret, or one found through the registered email domain or a domain spelled from the legal name. It is published only after the site proves it is this company's own, not a parent group's, chain's or brand's site (see rules).
 - **Company-owned profiles:** LinkedIn, Facebook, Instagram, X, YouTube and TikTok accounts that the verified website links to and whose handle is this company's name (or that the company registered as its website)
-- Contact points: registered company email and phone, plus email and phone links on the verified website's own domain (never published for sole proprietorships)
+- Contact points: registered company email and phone, plus role email addresses (post@, salg@ ...) and the main phone number from the verified website's own domain (never staff members' own details, and nothing for sole proprietorships)
 - Group structure
 - **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units (including ads posted under a brand name). Also single job ads linked from the verified website's careers page, when the ad names this company as the hiring organisation.
 - **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated posts from the verified website's news page.
@@ -84,9 +84,10 @@ Optional flags and environment variables:
   - it shows neither this company's name nor its organisation number (a brand site);
   - it is parked, does not answer, or is a directory listing. A social page registered as the website is published as a profile instead.
   The reason is given in the availability and in the summary. A registered website that cannot be read this time (robots.txt, bot protection or an outage) is kept only when its domain carries the company's name. A registered address that is a page on a larger site (`group.no/companies/this-one`) is verified as that page, and nothing else on that domain (news, jobs, emails) is used.
-- **Profiles only when the handle is this company's name.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name, give or take the legal form, a country word ("norge") or digits. A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out, and the site's domain is never used as a shortcut. Share buttons and personal profiles are ignored. Email and phone links are taken only on the site's own domain.
+- **Profiles only when the handle is this company's name.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name (give or take the legal form, a country word such as "norge", or digits), or the name of the company's own verified domain (its brand, as "agropumper" on agropumper.no). The domain rule is not used on a page of someone else's site, for a domain with a group word, or when another company named on the site has that name. A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out. Share buttons and personal profiles are ignored.
+- **Contacts without personal data.** Email links are taken only on the site's own domain and only for role addresses (post@, salg@, kundeservice@ and similar), never a staff member's own address. Only the site's main phone number is taken.
 - **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page (never a neighbour's) or its structured data. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
-- **Jobs are single ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform (each ad is read and must name this company as the hiring organisation), and structured `JobPosting` data that links to its own ad and names this company. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications and expired or undated postings are left out.
+- **Jobs are single ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title; closed ads are left out), and structured `JobPosting` data that links to its own ad and names this company. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications and expired or undated postings are left out.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
 ## Sources, rights and outbound policy
@@ -138,7 +139,15 @@ npm run check:signalpost-challenge    # live run on 10 well-known companies (exa
 
 **1,000-company live test (21 October 2026, the version before this one):** 1,000 companies drawn at random from Builderr's official company list. All 1,000 envelopes were `available`, with 0 integrity issues, 60,012 claims and 5,012 requests, in 228 s. An immediate re-run detected 0 changes. Two gaps showed up. Only 11% of companies register a website. NAV ads posted under a brand name were missed: 1 of 3 companies with active ads was found. This version's website step and organisation-number ad index address both. Details are in [`examples/smoke-1000-report.json`](examples/smoke-1000-report.json), with the sample in `examples/smoke-1000.txt`.
 
-**Live test of this version (22 October 2026, same 1,000 companies):**
+**Live check of this version's website rules (23 October 2026, after Builderr's audit of version 3):** every website registered in Enhetsregisteret for the same 1,000 companies (108) was checked with the agent's own code, loaded from GitHub at the tested commit and run on each company's site.
+- Version 3 published all of them as the company's website. This version publishes 47 that it verifies as the company's own (by organisation number or exact name) and keeps one it cannot read whose domain carries the company name.
+- 31 are group, parent, manager, chain or brand sites and are no longer published: REMA 1000's site for a REMA store, Baker Hansen's for its franchisee, OBOS, USBL, Vestbo and other housing managers' sites for housing co-ops, and parents' sites such as NorgesGruppen Eiendom, Ragde Eiendom and AVA Eiendom. Nothing from them (social links, news, jobs) is used. Nine more are empty, parked, closed or unrelated pages.
+- Oslo Røde Kors is verified as its own page on rodekors.no, and the national Red Cross accounts are not used.
+- Fixed from this check: two own sites that were missed, brand accounts named after the company's own domain, Jobylon ads without structured data, and staff members' personal email addresses and phones (only role addresses and the main number are published now).
+
+Details are in [`examples/live-test-v4-report.json`](examples/live-test-v4-report.json).
+
+**Live test of version 3 (22 October 2026, same 1,000 companies):**
 - **Registry research:** 1,000 of 1,000 envelopes `available`, 0 integrity issues, 183 s. An immediate re-run detected 0 changes and produced identical claim IDs.
 - **Hiring:** all 9,275 active NAV ads were read and indexed in about 4 minutes. The companies with active ads went from 1 to 3, and the attached ads from 1 to 5, including ads posted under brand names.
 - **Websites:** the check was run on real company sites:
@@ -148,7 +157,7 @@ npm run check:signalpost-challenge    # live run on 10 well-known companies (exa
 - **Website news and careers pages:** the check was run on five more real sites. CERTEGO's news page gave 10 dated items since 2025, and three sites gave their careers page and their LinkedIn, Facebook and YouTube pages. A holding company whose registered site shows its operating company's number was not verified. Two problems this check found were fixed: pages about working at the company were counted as openings, and an article was read as the news page.
 - **Candidates in the sample:** 108 companies register a website. Another 113 can be checked through their registered email domain, and 880 through domains spelled from their name.
 
-Details are in [`examples/live-test-v3-report.json`](examples/live-test-v3-report.json).
+Details of that test are in [`examples/live-test-v3-report.json`](examples/live-test-v3-report.json).
 
 To smoke-test against the live registry on a random sample of real companies:
 
@@ -157,7 +166,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (113 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (119 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -167,9 +176,11 @@ The offline self-test (113 checks) runs against simulated registry, NAV and comp
 - job ads: namesake employers rejected, brand-name ads found by organisation number, inactive ads removed, NAV outage handled
 - websites: verified by organisation number or by name plus registered address; namesake, parked, group (ambiguous) and name-only sites not published; private addresses never contacted; robots.txt respected
 - the website must be the company's own (Builderr's audit of version 3): a registered group site that names several companies, a chain site showing the chain's organisation number and a brand site showing neither name nor number are not published, and nothing is read from them; a company's page on its group's site is verified as that page only; a registered site behind bot protection is kept only when its domain carries the company's name
-- profiles: only handles that are the company's name; the parent group's, a sister company's, the web agency's and the theme's accounts, share buttons and brand handles left out; no false removals when a site is down or the web is unreachable
+- profiles: only handles that are the company's name or its own domain's; the parent group's, a sister company's, the web agency's and the theme's accounts and share buttons left out; no false removals when a site is down or the web is unreachable
+- contacts: role addresses and the main phone number only; a staff member's own email and phone left out
+- the live check's cases: a title naming the company only as a whole, a thin homepage on the company's name domain, a front page redirecting deeper on the same site
 - news: dated posts only, with the publish date from the post's own block; "Se flere nyheter", archive, product cards, a shop's new-products page, modified-only dates and a neighbour's date left out
-- jobs: single ads only, with the hiring organisation checked; the careers landing page, FINN and NAV searches, a sister company's ad, the parent's posting, postings without an employer or their own ad page, and expired postings left out
+- jobs: single ads only, with the hiring organisation checked (structured data or the ad's title); the careers landing page, FINN and NAV searches, a sister company's ad, the parent's posting, closed ads, postings without an employer or their own ad page, and expired postings left out
 - summary: the at-a-glance line, including the revenue trend
 - input formats, unfamiliar column or key names, and malformed numbers
 

@@ -82,7 +82,7 @@ const LEGAL_FORM_TOKENS = new Set([
   'as', 'asa', 'ans', 'da', 'enk', 'sa', 'nuf', 'sti', 'sam', 'iks', 'ks', 'kf', 'fli', 'brl', 'esek', 'bbl', 'pre',
   'ba', 'orgl', 'stiftelsen', 'stiftelse', 'ltd', 'limited', 'ab', 'gmbh', 'inc',
 ]);
-const FILLER_TOKENS = new Set(['og', 'and', 'the', 'i', 'of', 'for', 'avd', 'avdeling']);
+const FILLER_TOKENS = new Set(['og', 'and', 'the', 'i', 'of', 'for', 'av', 'til', 'avd', 'avdeling']);
 
 export function translit(s: string): string {
   return s
@@ -401,9 +401,10 @@ export function phoneDigits(s: string): string {
 
 function nameOnHomepage(home: PageAnalysis, host: string, tokens: string[]): string | null {
   if (!tokens.length) return null;
-  // Each part of a title is read on its own: "Tau Bygg – Tau Gruppen" names Tau Bygg in its first
-  // part and the parent group in its second.
-  const parts = [...[home.title, ...home.siteNames].flatMap((x) => x.split(/\s+[-\u2013\u2014|:\u00b7\u2022]\s+|\s*\|\s*/)), host.replace(/^www\./, '')].filter(Boolean);
+  // The whole title and each part of it: "Tau Bygg – Tau Gruppen" names Tau Bygg in its first part
+  // (the whole title, which names the group, is skipped), and "Bemanning | Personaltjenester |
+  // Telemark & Agder" names Personaltjenester Telemark only as a whole.
+  const parts = [...[home.title, ...home.siteNames].flatMap((x) => [x, ...x.split(/\s+[-\u2013\u2014|:\u00b7\u2022]\s+|\s*\|\s*/)]), host.replace(/^www\./, '')].filter(Boolean);
   for (const p of parts) {
     const t = new Set(translit(p).match(/[a-z0-9]+/g) || []);
     const compact = translit(p).replace(/[^a-z0-9]/g, '');
@@ -528,7 +529,9 @@ export async function verifyCandidate(
   const finalDomain = registrableDomain(finalHost);
   // A registered address deeper than the front page (group.no/selskaper/kappa-bygg) is one page
   // of someone else's site: only that page and the pages below it speak for this company.
-  const scoped = !ROOTISH_PATH.test(finalUrl.pathname);
+  // A front page that redirects deeper on the same site (/no/forside, a shop's /password) is still
+  // the front page; a deep registered address, or a redirect onto a deep page of another domain, is not.
+  const scoped = !ROOTISH_PATH.test(new URL(cand.url).pathname) || (registrableDomain(finalHost) !== cand.domain && !ROOTISH_PATH.test(finalUrl.pathname));
   const homeUrl = scoped ? `${finalUrl.protocol}//${finalHost}${finalUrl.pathname}` : `${finalUrl.protocol}//${finalHost}/`;
   // A placeholder page is not a company website, unless it shows this company's number.
   if (homeA.parked && !homeA.orgnrs.has(id.orgnr)) return v('parked', 'parked_or_placeholder_page', { pages: [homeA], homeUrl });
@@ -572,7 +575,9 @@ export async function verifyCandidate(
     // chain site listing its members) does not make the site this company's own.
     if (!homeName && looksLikeGroupSite(pages, id.legalName)) return v('ambiguous', 'site_shows_several_companies', base);
     const substantive = homeA.text.length >= 200;
-    if (cand.via !== 'name_domain_check' && (tokens.length >= 2 || substantive))
+    const label = translit(finalDomain.split('.')[0]).replace(/[^a-z0-9]/g, '');
+    const namedDomain = !!homeName && tokens.join('').length >= 4 && label.includes(tokens.join(''));
+    if (cand.via !== 'name_domain_check' && (tokens.length >= 2 || substantive || namedDomain))
       return v('exact', 'legal_name_on_site', {
         ...base,
         method: 'legal_name_on_site',
@@ -619,7 +624,7 @@ export function normalizeSocial(raw: string): SocialProfile | null {
   if (!parts.length) return null;
   const first = parts[0].toLowerCase();
   const rejectFirst: Record<string, string[]> = {
-    facebook: ['sharer', 'sharer.php', 'share.php', 'share', 'dialog', 'policy.php', 'privacy', 'events', 'groups', 'plugins', 'profile.php', 'login', 'hashtag', 'watch', 'help', 'pages', 'tr'],
+    facebook: ['sharer', 'sharer.php', 'share.php', 'share', 'dialog', 'policy.php', 'policy', 'policies', 'legal', 'privacy', 'search', 'business', 'ads', 'events', 'groups', 'plugins', 'profile.php', 'login', 'hashtag', 'watch', 'help', 'pages', 'tr'],
     instagram: ['p', 'reel', 'reels', 'stories', 'explore', 'accounts'],
     x: ['intent', 'share', 'home', 'search', 'i', 'hashtag'],
   };
@@ -647,36 +652,60 @@ export function normalizeSocial(raw: string): SocialProfile | null {
 // What may surround the company name in its own handle: legal form, country, "official", digits.
 const HANDLE_AFFIXES = ['official', 'offisiell', 'norway', 'norge', 'the', 'asa', 'ans', 'nor', 'as', 'sa', 'da', 'no'];
 
-/**
- * The account handle must be this company's name: every distinctive legal-name token (all but
- * one for names of four or more tokens), with nothing else around it but the legal form, a
- * country word, "official", digits or initials from the name. A parent group ("kappagruppen"),
- * a sister company, the web agency or the website theme does not pass. The site's domain is not
- * used: a group's domain label would let the group's own accounts through.
- */
-export function handleMatchesName(handleRaw: string, legalName: string): boolean {
+/** What is left of a handle once the given words, digits and affixes are taken out (null: a required word is missing). */
+function handleRest(handleRaw: string, words: string[], need: number, extra: string[] = []): string | null {
   let rest = translit(handleRaw).replace(/[^a-z0-9]/g, '');
-  const tokens = nameTokens(legalName);
-  if (!rest || !tokens.length || tokens.join('').length < 4) return false;
-  const need = tokens.length >= 4 ? tokens.length - 1 : tokens.length;
+  if (!rest) return null;
   let matched = 0;
-  for (const t of [...tokens].sort((a, b) => b.length - a.length)) {
+  for (const t of [...words].sort((a, b) => b.length - a.length)) {
     const at = rest.indexOf(t);
     if (at < 0) continue;
     rest = rest.slice(0, at) + '\u0000' + rest.slice(at + t.length);
     matched++;
   }
-  if (matched < need) return false;
+  if (matched < need) return null;
   rest = rest.replace(/\u0000/g, '').replace(/\d+/g, '');
-  const initials = (translit(legalName).match(/\b[a-z]\b/g) || []).join('');
+  for (const a of [...extra].sort((x, y) => y.length - x.length)) if (a) rest = rest.split(a).join('');
   for (const a of HANDLE_AFFIXES) rest = rest.split(a).join('');
-  for (const ch of initials) rest = rest.replace(ch, '');
-  return rest === '';
+  return rest;
 }
 
-export function socialMatchesIdentity(p: SocialProfile, legalName: string): boolean {
+/**
+ * The account handle must be this company's name: every distinctive legal-name token (all but
+ * one for names of four or more tokens), with nothing else around it but other words of the legal
+ * name ("for", the legal form, initials), a country word, "official" or digits. A parent group
+ * ("kappagruppen"), a sister company, the web agency or the website theme does not pass.
+ */
+export function handleMatchesName(handleRaw: string, legalName: string): boolean {
+  const tokens = nameTokens(legalName);
+  if (!tokens.length || tokens.join('').length < 4) return false;
+  const nameWords = translit(legalName).match(/[a-z0-9]+/g) || [];
+  return handleRest(handleRaw, tokens, tokens.length >= 4 ? tokens.length - 1 : tokens.length, nameWords) === '';
+}
+
+/**
+ * A handle that is the verified site's own domain name ("agropumper" on agropumper.no for Agro Bygg
+ * & Teknikk AS): the company's brand. Only for the company's own site (not a page on someone else's),
+ * when the domain carries a distinctive word of the legal name and no group word, and no other
+ * company named on the site has that name (a parent "Treteam AS" on treteam.no).
+ */
+export function handleIsSiteBrand(handleRaw: string, verdict: SiteVerdict, legalName: string): boolean {
+  if (verdict.status !== 'exact' || verdict.scoped) return false;
+  const label = translit(verdict.candidate.domain.split('.')[0]).replace(/[^a-z0-9]/g, '');
+  const tokens = nameTokens(legalName);
+  if (label.length < 4 || groupWordIn(label, tokens)) return false;
+  if (!(label.includes(tokens.join('')) || tokens.some((t) => t.length >= 4 && label.includes(t)))) return false;
+  if (handleRest(handleRaw, [label], 1) !== '') return false;
+  const core = translit(handleRaw).replace(/[^a-z0-9]/g, '');
+  return !otherEntities(verdict.pages, legalName).some((n) => {
+    const c = n.replace(/\s+(as|asa|sa|ans|da|nuf|ks)$/, '').replace(/\s+/g, '');
+    return c === label || c === core;
+  });
+}
+
+export function socialMatchesIdentity(p: SocialProfile, legalName: string, verdict?: SiteVerdict): boolean {
   const handle = decodeURIComponent(new URL(p.url).pathname.split('/').filter(Boolean).pop() || '').replace(/^@/, '');
-  return handleMatchesName(handle, legalName);
+  return handleMatchesName(handle, legalName) || (!!verdict && handleIsSiteBrand(handle, verdict, legalName));
 }
 
 export function profilesFrom(verdict: SiteVerdict, legalName: string): { profile: SocialProfile; page: PageAnalysis; via: string }[] {
@@ -685,20 +714,27 @@ export function profilesFrom(verdict: SiteVerdict, legalName: string): { profile
     const raw = [...page.links.map((l) => ({ u: l.url, via: 'link' })), ...page.sameAs.map((u) => ({ u, via: 'structured data sameAs' }))];
     for (const { u, via } of raw) {
       const p = normalizeSocial(u);
-      if (!p || out.has(p.url) || !socialMatchesIdentity(p, legalName)) continue;
+      if (!p || out.has(p.url) || !socialMatchesIdentity(p, legalName, verdict)) continue;
       out.set(p.url, { profile: p, page, via });
     }
   }
   return [...out.values()].sort((a, b) => a.profile.url.localeCompare(b.profile.url)).slice(0, 8);
 }
 
+// Company role addresses (post@, salg@, kundeservice@ ...). Addresses of named staff members
+// (ola.nordmann@, stine@, akh@) are personal data and are not published.
+const ROLE_MAILBOX = /^(post|postmottak|firmapost|info|informasjon|kontakt|contact|mail|epost|salg|sales|service|kundeservice|kundesenter|support|hjelp|help|ordre|order|ordrer|bestilling|booking|resepsjon|reception|regnskap|faktura|invoice|invoices|okonomi|accounting|admin|office|kontor|hello|hei|marked|marketing|presse|press|media|jobb|jobs|karriere|career|careers|rekruttering|hr|innkjop|purchase|purchasing|verksted|butikk|shop|nettbutikk|kunde|kunder|customer|drift|teknisk|tech|it|sekretariat|ekspedisjon|bedrift|forhandler|utleie|styret|styreleder|leder|dagligleder|daglig\.leder|daglig_leder|ledelse|personvern|privacy|dpo|varsling|bestillinger|avdeling|klinikk|resept|timebestilling|time)$/;
+
 export function siteContacts(verdict: SiteVerdict): { emails: { value: string; page: PageAnalysis }[]; phones: { value: string; page: PageAnalysis }[] } {
   const emails = new Map<string, PageAnalysis>();
   const phones = new Map<string, PageAnalysis>();
+  const label = verdict.candidate.domain.split('.')[0].toLowerCase();
   for (const page of verdict.pages) {
     for (const e of page.mailto) {
       if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(e)) continue;
       if (registrableDomain(e.split('@')[1]) !== verdict.candidate.domain) continue;
+      const local = e.split('@')[0].toLowerCase();
+      if (!ROLE_MAILBOX.test(local) && local !== label) continue;
       if (!emails.has(e)) emails.set(e, page);
     }
     for (const t of page.tel) {
@@ -709,7 +745,9 @@ export function siteContacts(verdict: SiteVerdict): { emails: { value: string; p
   }
   return {
     emails: [...emails.entries()].slice(0, 3).map(([value, page]) => ({ value, page })),
-    phones: [...phones.entries()].slice(0, 3).map(([value, page]) => ({ value, page })),
+    // The first number on the site (homepage first) is the switchboard; further numbers are
+    // usually staff members' own phones.
+    phones: [...phones.entries()].slice(0, 1).map(([value, page]) => ({ value, page })),
   };
 }
 
@@ -779,7 +817,11 @@ const ATS_HOSTS = /(^|\.)(teamtailor\.com|webcruiter\.(com|no)|jobbnorge\.no|rec
 const SINGLE_AD = /(\/jobs?\/\d{3,}|\/jobs?\/[0-9a-f]{8}-[0-9a-f]{4}-|[?&](advertid|projectid|jobid|job_id|vacancyid|adid|id)=\d{3,}|\/(stilling|stillinger|vacancy|vacancies|annonse|position|positions|ad|job-ad)\/\d{3,}|jobid:\d+|\/j\/[0-9a-f]{6,}|\/\d{6,}-[\w-]+|\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 const SEARCH_LIKE = /((^|\/)(search|sok|s%c3%b8k|browse|results?|resultat|filter|liste?)(\/|$|\.|\?)|[?&](q|query|s|search|orgid|employer|page|side|category|kategori)=)/i;
 const OPEN_APPLICATION = /([aå]pen s[oø]knad|apen-soknad|open application|generell s[oø]knad|spontaneous application|talent ?pool|talentbank)/i;
-const MAX_AD_PAGES = 4;
+const MAX_AD_PAGES = 6;
+// Recruiting platforms' own names in a page title ("Designer - Alpha | Teamtailor").
+const ATS_BRAND = /^(teamtailor|webcruiter|jobbnorge|recman|hr ?manager|jobylon|reachmee|easycruit|simplyrecruit|varbi|lever|greenhouse|smartrecruiters|workable|talentech|homerun|careers?|karriere|jobb|jobs|ledige stillinger|stillinger)$/i;
+// An ad page that says the position is filled or closed.
+const CLOSED_AD = /(stillingen er (ikke lenger|ikke) (aktiv|ledig|tilgjengelig)|annonsen er (utl[oø]pt|ikke lenger aktiv)|s[oø]knadsfristen (er|har) (g[aå]tt ut|utl[oø]pt|passert)|no longer (active|available|accepting)|this (job|position|ad) (is|has been) (closed|filled|expired)|position (has been )?filled|job (has )?expired)/i;
 
 export interface SiteNewsItem { date: string; title: string; url: string; snapshot: SourceSnapshot; via: string }
 export interface SiteJob {
@@ -974,6 +1016,7 @@ function findSectionLink(pages: PageAnalysis[], domain: string, path: RegExp, te
       }
       if (registrableDomain(u.hostname) !== domain) continue;
       const segs = u.pathname.split('/').filter(Boolean);
+      if (!segs.length) continue; // a "News" link back to the front page is not a news page
       const pathHit = path.test(u.pathname);
       const textHit = text.test(l.text.trim());
       if (!pathHit && !textHit) continue;
@@ -1113,8 +1156,29 @@ export async function readSiteActivity(
         act.snapshots.push(snap);
         if (ad.outcome !== 'ok') continue;
         const nodes = jobNodes(ad.page.html);
-        if (nodes.length !== 1 || !openingFor(nodes[0], id)) continue;
-        push(nodes[0], ad.page.url, ad.page.snapshot, 'job ad linked from the careers page');
+        if (nodes.length === 1) {
+          if (openingFor(nodes[0], id)) push(nodes[0], ad.page.url, ad.page.snapshot, 'job ad linked from the careers page');
+          continue;
+        }
+        if (nodes.length > 1) continue; // a list, not one ad
+        // No structured data (Jobylon and others): the ad's own title must name this company as the
+        // employer ("Teamleder kundeservice | Homely"), and the ad must not say it is closed.
+        const a = analyzePage(ad.page);
+        if (CLOSED_AD.test(a.text.slice(0, 20_000))) continue;
+        const titles = [a.title, ...a.siteNames].filter(Boolean);
+        let employer: string | null = null;
+        let jobTitle: string | null = null;
+        for (const t of titles) {
+          const segs = t.split(/\s+[-\u2013\u2014|:\u00b7\u2022]\s+|\s*\|\s*/).map((x) => x.trim()).filter((x) => x && !ATS_BRAND.test(x));
+          const at = segs.findIndex((x) => sameCompanyName(x, id.legalName));
+          if (at > 0) {
+            employer = segs[at];
+            jobTitle = segs[0];
+            break;
+          }
+        }
+        if (!employer || !jobTitle || jobTitle.length < 3 || jobTitle.length > 150 || GENERIC_LINK.test(jobTitle) || OPEN_APPLICATION.test(jobTitle)) continue;
+        push({ title: jobTitle, posted: null, expires: null, url: ad.page.url, org: employer, orgIds: [] }, ad.page.url, ad.page.snapshot, 'job ad linked from the careers page (employer named in the ad title)');
       }
       act.jobs = act.jobs.slice(0, 15);
     }
