@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseInputText } from '../input.ts';
 import { checkUrlShape, isPublicAddress, parseRobots, robotsAllows } from '../web.ts';
-import { findOrgnrs, normalizeSocial } from '../website.ts';
+import { findOrgnrs, handleMatchesName, normalizeSocial, otherEntities, publishedDate, sameCompanyName } from '../website.ts';
 import type { Envelope } from '../types.ts';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
@@ -73,7 +73,7 @@ check(!JSON.stringify(A1.claims).includes('Gammel stilling'), 'A: ad whose lates
 check(A1.evidence.some((e) => e.source_url.startsWith('https://pam-stilling-feed.nav.no/api/v1/feedentry/')), 'A: job ad evidence points to the NAV feed entry');
 check(B1.availability.job_postings.state === 'not_available' && B1.availability.job_postings.reason.startsWith('checked_nav_no_active_ads'), 'B: checked NAV, no ads → not_available with reason');
 check(A1.summary.text.includes('Hiring: 2 active job ads') && A1.summary.text.includes('Recent registry activity'), 'A: summary covers hiring and recent activity');
-check(A1.evidence.every((e) => e.source_url.startsWith('https://data.brreg.no/') || e.source_url.startsWith('https://pam-stilling-feed.nav.no/') || e.source_url.startsWith('https://www.alpha-test.no/')), 'all evidence comes from the registers, NAV or the company\'s own verified site');
+check(A1.evidence.every((e) => e.source_url.startsWith('https://data.brreg.no/') || e.source_url.startsWith('https://pam-stilling-feed.nav.no/') || e.source_url.startsWith('https://www.alpha-test.no/') || e.source_url.startsWith('https://alphatest.teamtailor.com/jobs/')), 'all evidence comes from the registers, NAV, the company\'s own verified site or a job ad its careers page links to');
 
 const evIds = new Set(A1.evidence.map((e) => e.id));
 check(A1.claims.every((c) => c.evidence_ids.length > 0 && c.evidence_ids.every((id) => evIds.has(id))), 'A: every claim points to existing evidence');
@@ -149,7 +149,7 @@ check(r6.length === 3 && by(r6, '91000006')?.errors[0]?.code === 'invalid_organi
 
 // --- Company websites: verification, profiles, contact links ------------------------------
 const webIn = path.join(work, 'web.csv');
-writeFileSync(webIn, ['orgnr', '910000063', '910000098', '910000802', '910000810', '910000829', '910000837', '910000845', '910000721', '910000888', '910000896'].join('\n'));
+writeFileSync(webIn, ['orgnr', '910000063', '910000098', '910000802', '910000810', '910000829', '910000837', '910000845', '910000721', '910000888', '910000896', '910000918', '910000926', '910000942', '910000950', '910000977', '910000985'].join('\n'));
 const wsState = path.join(work, 'web-state');
 const wrun = (name: string, env: Record<string, string> = {}) => {
   const out = path.join(work, name);
@@ -164,7 +164,7 @@ check(wa('910000063').official_website.reason === 'registered_and_verified_on_si
 const aSiteEv = by(w1, '910000063').evidence.find((e) => e.source_url === 'https://www.alpha-test.no/' && e.claim_span.includes('910 000 063'));
 check(!!aSiteEv && aSiteEv.source_class === 'company_owned' && !!aSiteEv.content_sha256, 'website: evidence quotes the site text with the organisation number, hashed');
 const prof = wc('910000063', 'social_profile').map((c) => (c.value as any).url).sort();
-check(prof.join() === 'https://facebook.com/testselskapalpha,https://linkedin.com/company/alpha-test', `profiles: company page and structured-data LinkedIn published; share link and web agency excluded (got ${prof})`);
+check(prof.join() === 'https://facebook.com/testselskapalpha,https://instagram.com/testselskap_alpha_as', `profiles: only accounts whose handle is the company's name; parent group, sister company, web agency, theme, share link and a brand handle left out (got ${prof})`);
 check(wc('910000063', 'email').map((c) => c.value).sort().join() === 'post@alpha-test.no,salg@alpha-test.no' && !JSON.stringify(by(w1, '910000063').claims).includes('webbyraa.no'), 'contacts: site email on its own domain added; other-domain email excluded; registered email not duplicated');
 check(wc('910000063', 'phone').some((c) => c.value === '+47 22334455'), 'contacts: phone link on the verified site added');
 const bSite = wc('910000098', 'website')[0];
@@ -192,21 +192,39 @@ check(wc('910000063', 'job_ad').length === 2 && by(w5, '910000063').claims.filte
 // --- Site news, careers page and the at-a-glance summary ---------------------------------
 const aW = by(w1, '910000063');
 const newsA = aW.claims.filter((c) => c.field === 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).sort();
-check(newsA.join('|') === '2025-03-03 Vi flytter til nye lokaler|2026-06-01 Alpha lanserer ny plattform|2026-09-15 Ny avtale med Bergen kommune', `site news: dated items from the news page and structured data, older items left out (got ${newsA.join('|')})`);
+check(newsA.join('|') === '2025-03-03 Vi flytter til nye lokaler|2026-06-01 Alpha lanserer ny plattform|2026-08-10 Ny styreleder valgt|2026-09-05 Vi åpner kontor i Tromsø|2026-09-15 Ny avtale med Bergen kommune', `site news: dated posts only, publish date not "updated" date; menu labels, archive, product pages, the listing's own data, modified-only dates and a neighbour's date left out (got ${newsA.join('|')})`);
 check(aW.claims.filter((c) => c.field === 'site_news').every((c) => c.source_date && c.family === 'public_activity'), 'site news: each item is dated public activity');
 const jobsA = aW.claims.filter((c) => c.field === 'site_job').map((c) => (c.value as any).title).sort();
-check(jobsA.join('|') === 'Backend-utvikler|Prosjektleder', `careers page: openings from job-board ad links and JobPosting data; expired data, generic links and the site's own pages left out (got ${jobsA.join('|')})`);
+check(jobsA.join('|') === 'Backend-utvikler|Driftstekniker|Prosjektleder', `jobs: single ads whose hiring organisation is this company (by name or organisation number); sister company's ad, parent's posting, posting without employer, posting without its own ad page, FINN and NAV searches, expired data and the site's own pages left out (got ${jobsA.join('|')})`);
+check(aW.claims.filter((c) => c.field === 'site_job').every((c) => (c.value as any).hiring_organisation && /^https:\/\/(alphatest\.teamtailor\.com\/jobs\/\d+-|www\.alpha-test\.no\/karriere\/.+)/.test((c.value as any).url)), 'jobs: each ad names its hiring organisation and points to the single ad, never to the careers landing page');
 check(!aW.claims.some((c) => c.field === 'site_job' && String((c.value as any).url).includes('11111111-1111')), 'careers page: a link to a NAV ad already attached is not counted twice');
-check(aW.claims.some((c) => c.field === 'careers_page') && aW.availability.job_postings.checked_sources.includes('company_website'), 'careers page published as a hiring signal; job postings record the website as checked');
+check(!aW.claims.some((c) => c.field === 'careers_page') && !aW.summary.text.includes('careers page') && aW.availability.job_postings.checked_sources.includes('company_website'), 'jobs: a careers landing page is not published as a job; the website is recorded as checked');
 check(aW.summary.statements[0]?.text.startsWith('At a glance: TESTSELSKAP ALPHA AS is a private limited company (AS) in Oslo') && aW.summary.text.includes('up 16% on 2024') && aW.summary.text.includes('it is hiring'), 'summary: at-a-glance line with form, place, revenue trend and hiring');
-check(aW.summary.text.includes('Latest news on its website: 2026-09-15 "Ny avtale med Bergen kommune"') && aW.summary.text.includes('openings listed on its careers page'), 'summary: latest site news and careers-page openings');
+check(aW.summary.text.includes('Latest news on its website: 2026-09-15 "Ny avtale med Bergen kommune"') && aW.summary.text.includes('job ads for this company linked from its website'), 'summary: latest site news and job ads from the website');
 check(by(w1, '910000098').summary.statements[0]?.text.startsWith('At a glance: TESTSELSKAP BETA AS is a private limited company (AS) in Bergen'), 'summary: at-a-glance line for a sparse profile');
+// Builderr audit: the website must be the company's own (not a group, chain or brand site), and
+// nothing is read from a site that is not.
+const noSiteData = (o: string) => !by(w1, o).claims.some((c) => ['website', 'social_profile', 'site_news', 'site_job'].includes(c.field) || c.key.includes('#website#'));
+check(wa('910000918').official_website.state === 'ambiguous' && wa('910000918').official_website.reason === 'registered_website_shows_several_companies' && noSiteData('910000918'), 'audit: registered group site naming several companies (no org numbers) → not published; no profiles, news or jobs from it');
+check(wa('910000926').official_website.reason === 'registered_website_belongs_to_another_entity' && noSiteData('910000926'), "audit: registered chain site showing the chain's org number → not published; its social links not used");
+check(wa('910000942').official_website.reason === 'registered_website_not_verified' && noSiteData('910000942'), 'audit: registered brand site showing neither name nor org number → not published');
+check(by(w1, '910000942').summary.text.includes("the registered site shows neither this company's name nor its organisation number"), 'audit: summary says why the registered site is not published');
+const tauSite = wc('910000950', 'website')[0];
+check((tauSite?.value as any)?.url === 'https://www.tau-gruppen.no/selskaper/tau-bygg' && tauSite.evidence_ids.length === 2 && wa('910000950').official_website.state === 'available', "audit: this company's page on the group's site verified by its org number and name; published as that page");
+check(wc('910000950', 'social_profile').map((c) => (c.value as any).url).join() === 'https://facebook.com/taubygg' && !wc('910000950', 'site_news').length && !wc('910000950', 'site_job').length && !by(w1, '910000950').claims.some((c) => c.key.includes('#website#')), "audit: on a page of the group's site only the company's own account is used; the group's news, jobs and email are not");
+check(wc('910000977', 'website')[0]?.confidence === 0.8 && wa('910000977').official_website.state === 'available' && wa('910000985').official_website.state === 'blocked' && !wc('910000985', 'website').length, 'audit: a registered site behind bot protection is kept only when its domain carries the company name');
+check(!wc('910000896', 'site_news').length && wa('910000896').official_website.state === 'available', 'audit: a web shop\'s "Nyheter" (new products) is not read as news');
 const aW3 = by(w3, '910000063');
-check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news' || c.field === 'careers_page'), 'website down: no false removals of site news, careers page or openings');
+check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news'), 'website down: no false removals of site news or job ads');
 
 // --- Website helpers --------------------------------------------------------------------
 check([...findOrgnrs('Org.nr. 810 034 882 MVA').keys()].join() === '810034882' && findOrgnrs('Ring 810034882').size === 0 && findOrgnrs('Oslo, Norge 810034882').size === 0, 'helpers: organisation numbers only counted where presented as such');
 check(normalizeSocial('https://no.linkedin.com/in/ola-nordmann') === null && normalizeSocial('https://www.facebook.com/sharer/sharer.php?u=x') === null && normalizeSocial('https://www.facebook.com/wix') === null, 'helpers: personal, share and vendor links rejected');
+check(['brunvoll6021|BRUNVOLL AS', 'certego-norge|CERTEGO AS', 'FlexiformAS|FLEXIFORM AS', 'flexiform.no|FLEXIFORM AS', 'christie-nordang-as|CHRISTIE NORDANG AS', 'bertelosteen|BERTEL O. STEEN AS'].every((x) => handleMatchesName(x.split('|')[0], x.split('|')[1])), 'helpers: company handles matched (legal form, country, digits and initials allowed)');
+check(!['kappagruppen|KAPPA BYGG AS', 'kappa|KAPPA BYGG AS', 'nordicgroup|NORDIC AS', 'nordicwebagency|NORDIC AS', 'webbyraa|TESTSELSKAP ALPHA AS', 'alpha-test|TESTSELSKAP ALPHA AS', 'testselskap-alpha-eiendom|TESTSELSKAP ALPHA AS'].some((x) => handleMatchesName(x.split('|')[0], x.split('|')[1])), 'helpers: parent group, sister company, agency and brand handles rejected');
+check(publishedDate('<p>Publisert 05.09.2026 · Oppdatert 01.10.2026</p>') === '2026-09-05' && publishedDate('<time class="updated" datetime="2026-10-15">15.10.2026</time>') === null && publishedDate('<p>Sist endret 3. mars 2026</p>') === null && publishedDate('<time datetime="2026-02-01">1. feb</time>') === '2026-02-01', 'helpers: publish date read; updated or modified dates ignored');
+check(otherEntities([{ title: 'Kappa Gruppen', text: 'Kappa Gruppen består av Kappa Bygg AS, Kappa Elektro AS og Kappa Eiendom AS.\n© Kappa Gruppen AS' }], 'KAPPA BYGG AS').length === 3 && otherEntities([{ title: 'Iota', text: 'Copyright © 2026 Iota Handel og Service AS – alle rettigheter reservert' }], 'IOTA HANDEL OG SERVICE AS').length === 0, 'helpers: other companies named on a page counted (the company itself not)');
+check(sameCompanyName('Testselskap Alpha', 'TESTSELSKAP ALPHA AS') && sameCompanyName('Certego Norge AS', 'CERTEGO AS') && !sameCompanyName('Alpha Gruppen AS', 'TESTSELSKAP ALPHA AS') && !sameCompanyName('Kappa Gruppen AS', 'KAPPA AS'), 'helpers: hiring organisation matched to the legal name; parent group not');
 check(!robotsAllows(parseRobots('User-agent: *\nDisallow: /admin\nAllow: /admin/public'), '/admin/x') && robotsAllows(parseRobots('User-agent: *\nDisallow: /admin\nAllow: /admin/public'), '/admin/public/a'), 'helpers: robots.txt longest-match rules');
 check(!isPublicAddress('169.254.169.254') && !isPublicAddress('10.0.0.5') && !isPublicAddress('::1') && !isPublicAddress('::ffff:192.168.1.1') && isPublicAddress('185.70.10.1'), 'helpers: private, link-local and loopback addresses blocked');
 check(['http://localhost/', 'https://user:pw@firma.no/', 'https://firma.no:8080/', 'file:///etc/passwd', 'http://169.254.169.254/'].every((u) => 'error' in checkUrlShape(u)), 'helpers: unsafe URL shapes refused');

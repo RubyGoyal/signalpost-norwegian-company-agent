@@ -19,10 +19,11 @@ import type { NavJobIndex } from './jobs.ts';
 import type { WebClient } from './web.ts';
 import {
   findWebsite,
-  nameTokens,
+  isDirectoryUrl,
   normalizeSocial,
   phoneDigits,
   profilesFrom,
+  registeredSitePlausible,
   siteContacts,
   type CompanyIdentity,
   type WebsiteOutcome,
@@ -205,7 +206,6 @@ function buildSummary(
       .filter((c) => c.field === 'operating_revenue' && /#(SELSKAP|UNSPECIFIED)#/.test(c.key) && typeof c.value === 'number')
       .sort((x, y) => String(y.reporting_period?.to).localeCompare(String(x.reporting_period?.to)));
     const ads = all('job_ad').length + all('site_job').length;
-    const careers = one('careers_page');
     const site = one('website');
     const deletedC = one('deleted_date');
     const flagsOn = claims.filter((c) => c.family === 'status_flags' && c.value === true && c.field !== 'registered_for_vat');
@@ -230,12 +230,11 @@ function buildSummary(
     if (deletedC) bits.push('it has been deleted from the register');
     else if (flagsOn.length) bits.push(`registry flags: ${flagsOn.map((x) => x.field.replace(/_/g, ' ')).join(', ')}`);
     if (ads) bits.push(`it is hiring (${ads} open position${ads === 1 ? '' : 's'} found)`);
-    else if (careers) bits.push('it has a careers page');
     if (site) bits.push(`website ${(site.value as any).url}`);
     const prevRev = rev.find((c) => rev[0] && String(c.reporting_period?.to).slice(0, 4) === String(Number(String(rev[0].reporting_period?.to).slice(0, 4)) - 1));
     st.push({
       text: `At a glance: ${bits.join('; ')}.`,
-      evidence_ids: ev(name, form, one('business_address'), nace, empC, rev[0], prevRev, site, careers, ...all('job_ad').slice(0, 2), ...all('site_job').slice(0, 2)),
+      evidence_ids: ev(name, form, one('business_address'), nace, empC, rev[0], prevRev, site, ...all('job_ad').slice(0, 2), ...all('site_job').slice(0, 2)),
     });
   }
   const purpose = one('statutory_purpose') || one('registered_activity');
@@ -359,7 +358,7 @@ function buildSummary(
         ? 'found from the company name and verified on the site'
         : web.evidence_ids.length > 1
         ? 'as registered, and verified on the site'
-        : 'as registered in Enhetsregisteret';
+        : 'as registered in Enhetsregisteret; the site could not be read this time';
     st.push({ text: `Website: ${w.url} (${how}).`, evidence_ids: ev(web) });
   }
   const profiles = all('social_profile');
@@ -371,7 +370,6 @@ function buildSummary(
 
   const ads = all('job_ad');
   const siteJobs = all('site_job');
-  const careers = one('careers_page');
   const hiring: string[] = [];
   if (ads.length) {
     const top = ads[0].value as any;
@@ -384,9 +382,13 @@ function buildSummary(
     hiring.push('no active job ads on arbeidsplassen.no (NAV) for this company or its sub-units');
   }
   if (siteJobs.length)
-    hiring.push(`${siteJobs.length} opening${siteJobs.length === 1 ? '' : 's'} listed on its careers page (${siteJobs.slice(0, 3).map((j) => `"${(j.value as any).title}"`).join(', ')})`);
-  else if (careers) hiring.push(`a careers page at ${(careers.value as any).url}`);
-  if (hiring.length) st.push({ text: `Hiring: ${hiring.join('; ')}.`, evidence_ids: ev(...ads.slice(0, 5), ...siteJobs.slice(0, 3), careers) });
+    hiring.push(
+      `${siteJobs.length} job ad${siteJobs.length === 1 ? '' : 's'} for this company linked from its website (${siteJobs
+        .slice(0, 3)
+        .map((j) => `"${(j.value as any).title}"`)
+        .join(', ')})`
+    );
+  if (hiring.length) st.push({ text: `Hiring: ${hiring.join('; ')}.`, evidence_ids: ev(...ads.slice(0, 5), ...siteJobs.slice(0, 3)) });
 
   const events = all('registry_event')
     .slice()
@@ -456,9 +458,16 @@ function buildSummary(
     if (r === 'no_verified_website') return `${f.replace(/_/g, ' ')} (no verified website to read them from)`;
     if (r === 'no_profiles_linked_from_verified_website') return `${f.replace(/_/g, ' ')} (none linked from its website)`;
     if (r === 'website_check_not_run') return `${f.replace(/_/g, ' ')} (website not checked in this run)`;
+    if (r === 'registered_website_parked') return `${f.replace(/_/g, ' ')} (registered domain is parked)`;
+    if (r === 'registered_website_belongs_to_another_entity') return `${f.replace(/_/g, ' ')} (the registered site shows another company's organisation number)`;
+    if (r === 'registered_website_shows_several_companies') return `${f.replace(/_/g, ' ')} (the registered site is a group site presenting several companies)`;
+    if (r === 'registered_website_not_verified') return `${f.replace(/_/g, ' ')} (the registered site shows neither this company's name nor its organisation number)`;
+    if (r === 'registered_website_not_reachable') return `${f.replace(/_/g, ' ')} (the registered site does not answer)`;
+    if (r === 'registered_website_is_a_directory_listing') return `${f.replace(/_/g, ' ')} (the registered address is a directory listing)`;
+    if (r === 'registered_website_is_a_social_profile') return `${f.replace(/_/g, ' ')} (the registered address is a social profile, published as a profile)`;
+    if (r === 'site_shows_several_companies' || r === 'site_shows_several_organisation_numbers') return `${f.replace(/_/g, ' ')} (the site found presents several companies)`;
     if (availability[f].state === 'ambiguous') return `${f.replace(/_/g, ' ')} (ambiguous: the site lists several companies)`;
     if (availability[f].state === 'blocked') return `${f.replace(/_/g, ' ')} (site does not allow automated access)`;
-    if (r === 'registered_website_parked') return `${f.replace(/_/g, ' ')} (registered domain is parked)`;
     return `${f.replace(/_/g, ' ')} (none registered)`;
   };
   if (unknowns.length)
@@ -485,6 +494,8 @@ export interface Gathered {
   locPages: FetchResult[];
   actPages: FetchResult[];
   website: WebsiteOutcome | null;
+  /** Why the website listed in Enhetsregisteret is not published as the company's own. */
+  registeredSiteDropped: string | null;
   b: ClaimBuilder;
   snapshots: SourceSnapshot[];
   errors: Envelope['errors'];
@@ -505,23 +516,52 @@ function identityFrom(orgnr: string, e: any): CompanyIdentity {
   };
 }
 
-/** Turns the website step's result into claims: verified website, linked profiles, site contact links. */
-function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome) {
+/**
+ * Turns the website step's result into claims: the company's own website, linked profiles, site
+ * contact links, dated news and single job ads. Returns why a website registered in
+ * Enhetsregisteret was not published as the company's own, when that was settled by reading it.
+ */
+function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome): string | null {
   const regKey = 'official_website#website';
-  // A social profile registered as the "website" in Enhetsregisteret is a company-owned profile
-  // declared in the official register.
   const regClaim = b.claims.find((c) => c.key === regKey);
-  const regSocial = regClaim ? normalizeSocial(String((regClaim.value as any).url || '')) : null;
-  if (regClaim && regSocial)
-    b.addFromEvidence(regClaim.evidence_ids[0], 'company_profiles', 'social_profile', regSocial.url, { platform: regSocial.platform, url: regSocial.url }, 0.95);
-  const reg = w.registryVerdict;
-  if (reg && b.claims.some((c) => c.key === regKey)) {
-    if (reg.status === 'exact' && reg.proof) b.addEvidence(regKey, reg.proof.page.snapshot, reg.proof.span, 0.99);
-    else if (reg.status === 'parked') b.remove(regKey);
-    else if (reg.status === 'rejected' || reg.status === 'ambiguous') b.setConfidence(regKey, 0.85);
+  const regUrl = regClaim ? String((regClaim.value as any).url || '') : '';
+  let dropped: string | null = null;
+  if (regClaim) {
+    const regSocial = normalizeSocial(regUrl);
+    const reg = w.registryVerdict;
+    if (regSocial) {
+      // A social profile registered as the "website" is a company-owned profile declared in the
+      // official register, not a website.
+      b.addFromEvidence(regClaim.evidence_ids[0], 'company_profiles', 'social_profile', regSocial.url, { platform: regSocial.platform, url: regSocial.url }, 0.95);
+      b.remove(regKey);
+      dropped = 'registered_website_is_a_social_profile';
+    } else if (isDirectoryUrl(regUrl)) {
+      b.remove(regKey);
+      dropped = 'registered_website_is_a_directory_listing';
+    } else if (reg?.status === 'exact' && reg.proof) {
+      b.addEvidence(regKey, reg.proof.page.snapshot, reg.proof.span, 0.99);
+    } else if (reg && ['parked', 'ambiguous', 'rejected', 'no_site'].includes(reg.status)) {
+      // The registry lists it, but the site is not this company's own: a group or chain site,
+      // another company's or brand's site, a parked domain, or nothing answers there.
+      b.remove(regKey);
+      dropped =
+        reg.status === 'parked'
+          ? 'registered_website_parked'
+          : reg.status === 'ambiguous'
+          ? 'registered_website_shows_several_companies'
+          : reg.status === 'no_site'
+          ? 'registered_website_not_reachable'
+          : reg.reason === 'site_shows_a_different_organisation_number'
+          ? 'registered_website_belongs_to_another_entity'
+          : 'registered_website_not_verified';
+    } else if (registeredSitePlausible(regUrl, id.legalName)) {
+      // Not readable this time (robots.txt, outage, step not run): kept as registered only when its
+      // domain carries the company's own name.
+      b.setConfidence(regKey, 0.8);
+    } else b.remove(regKey);
   }
   const v = w.verified;
-  if (!v) return;
+  if (!v) return dropped;
   if (!b.claims.some((c) => c.key === regKey) && v.candidate.via !== 'enhetsregisteret' && v.proof && v.homeUrl) {
     b.add(
       v.proof.page.snapshot,
@@ -533,30 +573,33 @@ function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome) 
       { confidence: v.confidence ?? 0.9 }
     );
   }
-  const tokens = nameTokens(id.legalName);
-  for (const p of profilesFrom(v, tokens)) {
+  for (const p of profilesFrom(v, id.legalName)) {
     b.add(p.page.snapshot, 'company_profiles', 'social_profile', p.profile.url, { platform: p.profile.platform, url: p.profile.url }, `${p.via}: ${p.profile.url}`, {
       confidence: 0.9,
     });
   }
-  // Dated news and job openings published on the verified site.
+  // Dated posts and single job ads for this company, read from its own verified site.
   const act = w.activity;
   if (act) {
     for (const n of act.news)
-      b.add(n.snapshot, 'public_activity', 'site_news', `site#${n.url}`, { date: n.date, title: n.title, url: n.url }, `news item (${n.via}): "${n.title}" ${n.date}`, {
+      b.add(n.snapshot, 'public_activity', 'site_news', `site#${n.url}`, { date: n.date, title: n.title, url: n.url }, `news item (${n.via}): "${n.title}" published ${n.date}`, {
         sourceDate: n.date,
         confidence: 0.85,
       });
-    if (act.careersPage)
-      b.add(act.careersPage.snapshot, 'job_postings', 'careers_page', 'site#careers', { url: act.careersPage.url }, 'careers page on the verified website', { confidence: 0.9 });
     for (const j of act.jobs)
-      b.add(j.snapshot, 'job_postings', 'site_job', `site#${j.url}#${j.title}`, { title: j.title, url: j.url, listed_on: j.listed_on, ...(j.posted ? { posted: j.posted } : {}), ...(j.expires ? { expires: j.expires } : {}) }, `job opening (${j.via}): ${j.title}`, {
-        sourceDate: j.posted,
-        confidence: 0.85,
-      });
+      b.add(
+        j.snapshot,
+        'job_postings',
+        'site_job',
+        `site#${j.url}#${j.title}`,
+        { title: j.title, url: j.url, listed_on: j.listed_on, ...(j.hiring_organisation ? { hiring_organisation: j.hiring_organisation } : {}), ...(j.posted ? { posted: j.posted } : {}), ...(j.expires ? { expires: j.expires } : {}) },
+        `job ad (${j.via}): "${j.title}", hiring organisation ${j.hiring_organisation ?? 'this company'}`,
+        { sourceDate: j.posted, confidence: 0.85 }
+      );
   }
-  // Contact links on the company's own domain. Never for sole proprietorships (a person's details).
-  if (id.formCode === 'ENK') return;
+  // Contact links on the company's own domain. Never for sole proprietorships (a person's details),
+  // and never from a page on someone else's domain.
+  if (id.formCode === 'ENK' || v.scoped) return dropped;
   const regEmail = (id.email || '').toLowerCase();
   const c = siteContacts(v);
   for (const e of c.emails)
@@ -564,6 +607,7 @@ function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome) 
   for (const ph of c.phones)
     if (!id.phones.includes(ph.value))
       b.add(ph.page.snapshot, 'contact_points', 'phone', `website#${ph.value}`, `+47 ${ph.value}`, `tel link: ${ph.value}`, { confidence: 0.9 });
+  return dropped;
 }
 
 /** Phase 1: registry sources and the company website (no dependence on the NAV index). */
@@ -583,6 +627,7 @@ export async function gatherCompany(rawOrgnr: string, inputIndex: number, ctx: R
     locPages: [],
     actPages: [],
     website: null,
+    registeredSiteDropped: null,
     b,
     snapshots: [],
     errors: [],
@@ -662,7 +707,7 @@ export async function gatherCompany(rawOrgnr: string, inputIndex: number, ctx: R
     if (g.website) {
       for (const v of g.website.verdicts) g.snapshots.push(...v.snapshots);
       if (g.website.activity) g.snapshots.push(...g.website.activity.snapshots);
-      websiteClaims(b, id, g.website);
+      g.registeredSiteDropped = websiteClaims(b, id, g.website);
       // Page texts are no longer needed; drop them so a large batch stays light in memory.
       for (const v of g.website.verdicts) {
         v.pages = [];
@@ -698,9 +743,15 @@ function websiteAvailability(g: Gathered, entOk: boolean): Pick<Record<FieldFami
       reason: via ? `verified_on_site_via_${via}` : site.evidence_ids.length > 1 ? 'registered_and_verified_on_site' : 'registered_in_enhetsregisteret',
       checked_sources: sources,
     };
-  } else if (w?.registryVerdict?.status === 'parked') official_website = { state: 'not_available', reason: 'registered_website_parked', checked_sources: sources };
+  } else if (g.registeredSiteDropped && w?.state !== 'incomplete')
+    official_website = {
+      state: g.registeredSiteDropped === 'registered_website_shows_several_companies' ? 'ambiguous' : 'not_available',
+      reason: g.registeredSiteDropped,
+      checked_sources: g.registeredSiteDropped.startsWith('registered_website_is_a_') ? ['enhetsregisteret'] : sources,
+    };
   else if (!w || w.state === 'disabled') official_website = { state: 'not_available', reason: 'website_check_not_run', checked_sources: ['enhetsregisteret'] };
-  else if (w.state === 'ambiguous') official_website = { state: 'ambiguous', reason: 'site_shows_several_organisation_numbers', checked_sources: sources };
+  else if (w.state === 'ambiguous')
+    official_website = { state: 'ambiguous', reason: w.verdicts.find((x) => x.status === 'ambiguous')?.reason || 'site_shows_several_companies', checked_sources: sources };
   else if (w.state === 'incomplete') official_website = { state: 'failed', reason: 'website_check_incomplete', checked_sources: sources };
   else if (w.state === 'blocked') official_website = { state: 'blocked', reason: w.verdicts[0]?.reason || 'site_not_allowed', checked_sources: sources };
   else official_website = { state: 'not_available', reason: 'no_verified_website_found', checked_sources: sources };

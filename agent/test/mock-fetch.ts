@@ -23,6 +23,13 @@ const K = '910000837'; // registered website disallows robots → not read
 const L = '910000845'; // name-spelled domain shows only the name → not enough
 const M = '910000888'; // registered "website" is a Facebook page → a registered profile, not crawled
 const N = '910000896'; // email-domain site: brand-only title, full legal name in the footer → verified
+// Builderr audit (version 3): the website must be the company's own, not a group, chain or brand site.
+const O = '910000918'; // registered website is the parent group's site: names several companies, no org numbers
+const P = '910000926'; // registered website is the chain's site, showing the chain's own org number
+const Q = '910000942'; // registered website is a brand site showing neither the name nor the org number
+const R = '910000950'; // registered website is this company's page on the group's site (a path)
+const S = '910000977'; // registered website refuses automated readers (HTTP 403); its domain carries the name → kept
+const T = '910000985'; // registered website refuses automated readers; a chain-style domain without the name → not kept
 
 const env: Record<string, string | undefined> = (globalThis as any).process?.env ?? {};
 const mutate = env.MOCK_MUTATE === '1';
@@ -97,6 +104,12 @@ const entities: Record<string, unknown> = {
       [L, 'TESTSELSKAP ETA AS', { epostadresse: 'post@eta-mail.no' }],
       [M, 'TESTSELSKAP THETA AS', { hjemmeside: 'https://www.facebook.com/testselskaptheta' }],
       [N, 'IOTA HANDEL OG SERVICE AS', { epostadresse: 'post@iota-butikk.no' }],
+      [O, 'KAPPA BYGG AS', { hjemmeside: 'www.kappa-gruppen.no' }],
+      [P, 'LAMBDA MAJORSTUEN AS', { hjemmeside: 'www.lambda-kjeden.no' }],
+      [Q, 'SIGMA RØR AS', { hjemmeside: 'www.vvs-partner.no' }],
+      [R, 'TAU BYGG AS', { hjemmeside: 'www.tau-gruppen.no/selskaper/tau-bygg' }],
+      [S, 'TESTSELSKAP OMEGA AS', { hjemmeside: 'www.omega-test.no' }],
+      [T, 'TESTSELSKAP PSI AS', { hjemmeside: 'www.butikkjeden.no' }],
     ] as [string, string, Record<string, string>][]).map(([o, navn, extra]) => [
       o,
       {
@@ -296,6 +309,13 @@ const DNS: Record<string, string> = {
   'eta-mail.no': PUBLIC_IP,
   'iota-butikk.no': PUBLIC_IP,
   'www.eta-mail.no': PUBLIC_IP,
+  'www.kappa-gruppen.no': PUBLIC_IP,
+  'www.lambda-kjeden.no': PUBLIC_IP,
+  'www.vvs-partner.no': PUBLIC_IP,
+  'www.tau-gruppen.no': PUBLIC_IP,
+  'alphatest.teamtailor.com': PUBLIC_IP,
+  'www.omega-test.no': PUBLIC_IP,
+  'www.butikkjeden.no': PUBLIC_IP,
 };
 (globalThis as any).__SIGNALPOST_DNS__ = async (host: string) => {
   if (noWeb || !DNS[host]) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
@@ -318,6 +338,10 @@ const WEB: Record<string, Site> = {
          <a href="mailto:salg@alpha-test.no">salg@alpha-test.no</a> <a href="mailto:post@alpha-test.no">post</a>
          <a href="tel:+4722334455">22 33 44 55</a>
          <a href="https://www.facebook.com/testselskapalpha">Facebook</a>
+         <a href="https://www.instagram.com/testselskap_alpha_as/">Instagram</a>
+         <a href="https://www.facebook.com/alphagruppen">Alpha-gruppen</a>
+         <a href="https://www.linkedin.com/company/testselskap-alpha-eiendom/">Alpha Eiendom</a>
+         <a href="https://www.youtube.com/@flatsometheme">Tema: Flatsome</a>
          <a href="https://www.instagram.com/webbyraa/">Laget av Webbyr&aring;</a> <a href="mailto:hei@webbyraa.no">byr&aring;</a></footer>`,
         '<meta property="og:site_name" content="Alpha Test"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Testselskap Alpha AS","sameAs":["https://www.linkedin.com/company/alpha-test/"]}</script>'
       ),
@@ -327,20 +351,34 @@ const WEB: Record<string, Site> = {
          <article><h2><a href="/nyheter/ny-avtale-med-kommunen">Ny avtale med Bergen kommune</a></h2><time datetime="2026-09-15">15. september 2026</time></article>
          <article><a href="/nyheter/vi-flytter"><h3>Vi flytter til nye lokaler</h3></a><p>Publisert 3. mars 2025</p></article>
          <article><a href="/nyheter/gammel-sak">Gammel sak fra arkivet vårt</a><span>12.06.2023</span></article>
+         <article><a href="/nyheter/nytt-kontor-i-tromso"><h3>Vi åpner kontor i Tromsø</h3></a><p>Publisert 05.09.2026 · Oppdatert 01.10.2026</p></article>
+         <article><a href="/nyheter/endrede-apningstider"><h3>Endringer i åpningstidene</h3></a><p>Sist oppdatert: 12.10.2026</p></article>
+         <article><a href="/nyheter/prisliste-2027"><h3>Ny prisliste for 2027 er klar</h3></a><time class="updated" datetime="2026-10-15">15.10.2026</time></article>
+         <article class="card"><a href="/nyheter/ny-kontorstol-ergo"><h3>Ny kontorstol Ergo Pro</h3></a><time datetime="2026-09-01">1. september 2026</time><span class="price">2 499,-</span></article>
+         <div class="grid">
+           <div class="card"><a href="/nyheter/sommerfest"><h3>Sommerfest for alle ansatte</h3></a></div>
+           <div class="card"><span class="date">10.08.2026</span><a href="/nyheter/ny-styreleder"><h3>Ny styreleder valgt</h3></a></div>
+         </div>
+         <div class="more"><a href="/nyheter/alle-saker">Se alle nyheter &rarr;</a> <time datetime="2026-10-01">1. oktober 2026</time></div>
+         <div class="more"><a href="/nyheter/arkiv">Nyhetsarkiv</a> <span>Oppdatert 20.10.2026</span></div>
+         <a href="/nyheter/produkter/kontorstoler">Se våre nye produkter</a> <span>02.10.2026</span>
          <a href="/nyheter?side=2">Neste</a>`,
-        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"Alpha lanserer ny plattform","datePublished":"2026-06-01T08:00:00+02:00","url":"https://www.alpha-test.no/nyheter/ny-plattform"}</script>'
+        '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"NewsArticle","headline":"Alpha lanserer ny plattform","datePublished":"2026-06-01T08:00:00+02:00","url":"https://www.alpha-test.no/nyheter/ny-plattform"},{"@context":"https://schema.org","@type":"Article","headline":"Nyheter","datePublished":"2026-01-01","url":"https://www.alpha-test.no/nyheter"},{"@context":"https://schema.org","@type":"BlogPosting","headline":"Oppdatert artikkel om sikkerhet","dateModified":"2026-10-10","url":"https://www.alpha-test.no/nyheter/sikkerhet"}]</script>'
       ),
       '/karriere': page(
         'Karriere – Testselskap Alpha',
         `<h1>Jobb hos oss</h1>
          <ul><li><a href="https://alphatest.teamtailor.com/jobs/123456-backend-utvikler">Backend-utvikler</a></li>
+         <li><a href="https://alphatest.teamtailor.com/jobs/223344-regnskapsforer">Regnskapsfører (Alpha Eiendom)</a></li>
+         <li><a href="https://www.finn.no/job/fulltime/search.html?orgId=12345">Se våre stillinger på FINN</a></li>
+         <li><a href="https://arbeidsplassen.nav.no/stillinger?q=testselskap%20alpha">Ledige stillinger hos NAV</a></li>
          <li><a href="https://arbeidsplassen.nav.no/stillinger/stilling/11111111-1111-4111-8111-111111111111">Senior utvikler (NAV)</a></li>
          <li><a href="/karriere/sommerjobb-2027">Sommerjobb 2027</a></li>
          <li><a href="/karriere/vare-verdier">Våre verdier og kultur</a></li>
          <li><a href="/karriere/we-are-alpha">We are Alpha</a></li>
          <li><a href="/karriere/apen-soknad">Send en åpen søknad</a></li></ul>
          <a href="/karriere">Karriere</a> <a href="https://alphatest.teamtailor.com/jobs">Se alle</a>`,
-        '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","url":"https://alphatest.teamtailor.com/jobs/654321-prosjektleder"},{"@context":"https://schema.org","@type":"JobPosting","title":"Utgått stilling","datePosted":"2019-01-01","validThrough":"2020-01-01"}]</script>'
+        '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","url":"https://alphatest.teamtailor.com/jobs/654321-prosjektleder","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Driftstekniker","datePosted":"2026-10-05","validThrough":"2099-01-01","url":"/karriere/driftstekniker-2026","hiringOrganization":{"@type":"Organization","name":"Alpha Test","identifier":"910 000 063"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Konsernsjef","datePosted":"2026-10-02","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Alpha Gruppen AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Uten arbeidsgiver","datePosted":"2026-10-02","validThrough":"2099-01-01"},{"@context":"https://schema.org","@type":"JobPosting","title":"Lagermedarbeider","datePosted":"2026-10-02","validThrough":"2099-01-01","hiringOrganization":{"name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Utgått stilling","datePosted":"2019-01-01","validThrough":"2020-01-01"}]</script>'
       ),
     },
   },
@@ -369,15 +407,81 @@ const WEB: Record<string, Site> = {
   },
   'testselskapeta.no': { pages: { '/': page('Testselskap Eta', '<p>Velkommen til Testselskap Eta. Vi tilbyr gode tjenester til våre kunder over hele landet.</p>') } },
   'iota-butikk.no': {
-    pages: { '/': page('Iota Butikk – alt til hjemmet', '<p>Nettbutikk for kjøkken og interiør.</p><footer>Copyright &copy; 2026 Iota Handel og Service AS &ndash; alle rettigheter reservert</footer>') },
+    pages: {
+      '/': page('Iota Butikk – alt til hjemmet', '<nav><a href="/nyheter">Nyheter</a></nav><p>Nettbutikk for kjøkken og interiør.</p><footer>Copyright &copy; 2026 Iota Handel og Service AS &ndash; alle rettigheter reservert</footer>'),
+      '/nyheter': page(
+        'Nyheter – Iota Butikk',
+        `<ul><li><a href="/nyheter/kaffekopp-blaa"><h3>Kaffekopp blå</h3></a><span>Lagt ut 02.10.2026</span><span>149,-</span><button>Legg i handlekurv</button></li>
+         <li><a href="/nyheter/skjaerebrett-eik"><h3>Skjærebrett i eik</h3></a><span>Lagt ut 28.09.2026</span><span>kr 399,00</span><button>Legg i handlekurv</button></li>
+         <li><a href="/nyheter/brodkurv"><h3>Brødkurv i rotting</h3></a><span>Lagt ut 20.09.2026</span><span>249,-</span><button>Legg i handlekurv</button></li></ul>`
+      ),
+    },
   },
 };
+Object.assign(WEB, {
+  'www.kappa-gruppen.no': {
+    pages: {
+      '/': page(
+        'Kappa Gruppen – bygg og anlegg',
+        `<nav><a href="/nyheter">Nyheter</a> <a href="/karriere">Karriere</a></nav>
+         <p>Kappa Gruppen består av Kappa Bygg AS, Kappa Elektro AS og Kappa Eiendom AS.</p>
+         <footer>&copy; Kappa Gruppen AS <a href="https://www.facebook.com/kappagruppen">Facebook</a> <a href="https://www.linkedin.com/company/kappa-bygg">LinkedIn</a></footer>`
+      ),
+      '/nyheter': page('Nyheter', '<article><a href="/nyheter/kappa-kjoper-selskap"><h3>Kappa Gruppen kjøper nytt selskap</h3></a><time datetime="2026-09-01">1. september 2026</time></article>'),
+      '/karriere': page('Karriere', '<a href="https://kappa.teamtailor.com/jobs/777777-anleggsleder">Anleggsleder</a>'),
+    },
+  },
+  'www.lambda-kjeden.no': {
+    pages: {
+      '/': page(
+        'Lambda – din lokale butikk',
+        `<nav><a href="/nyheter">Nyheter</a></nav><p>Finn din nærmeste Lambda-butikk.</p>
+         <footer>Lambda Kjeden AS &middot; Org.nr 910 000 934 <a href="https://www.facebook.com/lambdamajorstuen">Facebook</a></footer>`
+      ),
+    },
+  },
+  'www.vvs-partner.no': {
+    pages: {
+      '/': page('VVS Partner – rørlegger i Oslo', '<p>Din rørlegger i Oslo og omegn. Ring oss for et uforpliktende tilbud.</p><footer><a href="https://www.facebook.com/sigmaror">Facebook</a></footer>'),
+    },
+  },
+  'www.tau-gruppen.no': {
+    pages: {
+      '/selskaper/tau-bygg': page(
+        'Tau Bygg – Tau Gruppen',
+        `<nav><a href="/nyheter">Nyheter</a> <a href="/karriere">Karriere</a> <a href="/kontakt">Kontakt</a></nav>
+         <h1>Tau Bygg</h1><p>Tau Bygg AS bygger boliger på Østlandet. Org.nr 910 000 950.</p>
+         <p><a href="mailto:post@tau-gruppen.no">post@tau-gruppen.no</a> <a href="https://www.facebook.com/taubygg">Tau Bygg på Facebook</a></p>
+         <footer>Tau Gruppen AS &middot; Org.nr 910 000 969 <a href="https://www.facebook.com/taugruppen">Tau Gruppen</a></footer>`
+      ),
+      '/nyheter': page('Nyheter', '<article><a href="/nyheter/tau-gruppen-vokser"><h3>Tau Gruppen vokser videre</h3></a><time datetime="2026-09-10">10. september 2026</time></article>'),
+      '/karriere': page('Karriere', '<script type="application/ld+json">{"@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","hiringOrganization":{"name":"Tau Gruppen AS"}}</script>'),
+    },
+  },
+  'alphatest.teamtailor.com': {
+    robots: 'User-agent: *\nAllow: /\n',
+    pages: {
+      '/jobs/123456-backend-utvikler': page(
+        'Backend-utvikler – Testselskap Alpha',
+        '<h1>Backend-utvikler</h1>',
+        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Backend-utvikler","datePosted":"2026-10-03","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}}</script>'
+      ),
+      '/jobs/223344-regnskapsforer': page(
+        'Regnskapsfører – Alpha Eiendom',
+        '<h1>Regnskapsfører</h1>',
+        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Regnskapsfører","datePosted":"2026-10-03","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Alpha Eiendom AS"}}</script>'
+      ),
+    },
+  },
+} as Record<string, Site>);
 const html = (body: string) => new Response(body, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 function webResponse(url: URL): Response {
   const host = url.hostname;
   if (siteDown && host.endsWith('alpha-test.no')) throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
   // A mail-only domain: it resolves, but no web server answers.
   if (host.endsWith('eta-mail.no')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+  // Bot protection: every request is refused, robots.txt included.
+  if (host === 'www.omega-test.no' || host === 'www.butikkjeden.no') return new Response('<h1>Access denied</h1>', { status: 403, headers: { 'content-type': 'text/html' } });
   const site = WEB[host];
   if (!site) throw new TypeError('fetch failed');
   if (url.pathname === '/robots.txt') return site.robots ? new Response(site.robots, { status: 200, headers: { 'content-type': 'text/plain' } }) : new Response('not found', { status: 404 });

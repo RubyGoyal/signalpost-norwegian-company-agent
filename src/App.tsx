@@ -102,8 +102,7 @@ const FIELD_LABELS: Record<string, string> = {
   mobile: 'Mobile',
   social_profile: 'Profile',
   site_news: 'News (company website)',
-  site_job: 'Opening (careers page)',
-  careers_page: 'Careers page',
+  site_job: 'Job ad (company website)',
   job_ad: 'Job ad',
   registry_event: 'Registry event',
 };
@@ -217,17 +216,12 @@ function formatValue(c: Claim): ReactNode {
           {v.title}
         </a>
         <span className="text-slate-500">
+          {v.hiring_organisation ? ` · ${v.hiring_organisation}` : ''}
           {v.listed_on ? ` · ${v.listed_on}` : ''}
           {v.posted ? ` · posted ${v.posted}` : ''}
           {v.expires ? ` · until ${v.expires}` : ''}
         </span>
       </span>
-    );
-  if (c.field === 'careers_page')
-    return (
-      <a href={v.url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2 break-all">
-        {v.url}
-      </a>
     );
   if (c.field === 'job_ad')
     return (
@@ -821,7 +815,7 @@ function CompareView({ orgnrs }: { orgnrs: string[] }) {
     ['Auditor', (e) => e.claims.find((c) => c.field === 'role' && (c.value as any).role_code === 'REVI')],
     ['Website', (e) => e.claims.find((c) => c.field === 'website')],
     ['Profile', (e) => e.claims.find((c) => c.field === 'social_profile')],
-    ['Latest job opening', (e) => e.claims.find((c) => c.field === 'job_ad') || e.claims.find((c) => c.field === 'site_job') || e.claims.find((c) => c.field === 'careers_page')],
+    ['Latest job opening', (e) => e.claims.find((c) => c.field === 'job_ad') || e.claims.find((c) => c.field === 'site_job')],
     ['Latest website news', (e) => e.claims.filter((c) => c.field === 'site_news').sort((a, b) => String((b.value as any).date).localeCompare(String((a.value as any).date)))[0]],
   ];
 
