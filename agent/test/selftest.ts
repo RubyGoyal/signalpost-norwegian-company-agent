@@ -5,8 +5,9 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseInputText } from '../input.ts';
+import { qualityReport } from '../quality.ts';
 import { checkUrlShape, isPublicAddress, parseRobots, robotsAllows } from '../web.ts';
-import { findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, publishedDate, sameCompanyName } from '../website.ts';
+import { feedItems, findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, publishedDate, sameCompanyName } from '../website.ts';
 import type { Envelope } from '../types.ts';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
@@ -62,7 +63,7 @@ const ev1 = fieldsA('registry_event').map((c) => (c.value as any).event);
 check(A1.availability.public_activity.state === 'available' && ev1.length === 2, `A: 2 dated registry events published (got ${ev1.length})`);
 check(ev1.some((t) => t.includes('annual accounts filed: 2025')) && ev1.some((t) => t.includes('employee count updated: 42')), 'A: events describe what changed');
 check(!ev1.some((t) => /registreringsdato/.test(t)), 'A: bookkeeping-only changes and empty "Ukjent" events skipped');
-check(B1.availability.public_activity.state === 'not_available', 'B: no registry events → not_available');
+check(!B1.claims.some((c) => c.field === 'registry_event') && B1.availability.public_activity.state === 'available' && B1.claims.every((c) => c.field !== 'site_news' || c.evidence_ids.length === 1), 'B: no registry events; its public activity is the dated post from its own feed');
 const ads1 = fieldsA('job_ad');
 check(A1.availability.job_postings.state === 'available' && ads1.length === 2, `A: exactly 2 job ads attached (got ${ads1.length})`);
 check(ads1.some((c) => (c.value as any).title === 'Kokk' && (c.value as any).employer_name === 'Alpha Kantine Bergen'), 'A: ad posted under a brand name found by employer organisation number');
@@ -89,6 +90,7 @@ check(A1.summary.text.includes('Programmeringstjenester') && A1.summary.text.inc
 check(A1.refresh.baseline === 'cold_start' && A1.refresh.changes.length === 0, 'A: cold start reports no changes');
 const report = JSON.parse(readFileSync(path.join(work, 'run1', 'run-report.json'), 'utf8'));
 check(report.one_envelope_per_input === true && report.third_party_cost_usd === 0, 'run report confirms one envelope per input and $0 third-party cost');
+check(report.quality?.all_checks_passed === true && report.quality.issues === 0 && report.quality.claims_by_source_class.official_registry > 0, `run report: quality checks pass (evidence for every claim, sourced evidence, no website facts without a verified website) (issues: ${JSON.stringify(report.quality?.checks)})`);
 check(report.nav_job_feed?.ok === true && report.nav_job_feed.feed_pages === 2 && report.nav_job_feed.active_ads === 3 && report.nav_job_feed.detail_scan_complete === true, 'run report records the NAV feed read (2 pages, 3 active ads after dedupe, all read)');
 
 // --- Run 2: same snapshot → idempotent ---------------------------------------
@@ -157,6 +159,8 @@ const wrun = (name: string, env: Record<string, string> = {}) => {
   return readFileSync(path.join(out, 'envelopes.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) as Envelope[];
 };
 const w1 = wrun('web1');
+const wq = JSON.parse(readFileSync(path.join(work, 'web1', 'run-report.json'), 'utf8')).quality;
+check(wq.all_checks_passed === true && wq.from_company_websites.dated_news_posts_from_feeds >= 2 && wq.from_company_websites.job_ads === 4 && wq.websites.not_published_by_reason['not_available:registered_website_belongs_to_another_entity'] === 1 && wq.websites.published_by_how_verified.registered_and_verified_on_site >= 1, `run report: quality section counts website results and passes on the website fixtures (got ${JSON.stringify(wq).slice(0, 400)})`);
 const wa = (o: string) => by(w1, o).availability;
 const wc = (o: string, f: string) => by(w1, o).claims.filter((c) => c.field === f);
 const aSite = wc('910000063', 'website')[0];
@@ -193,15 +197,18 @@ check(wc('910000063', 'job_ad').length === 2 && by(w5, '910000063').claims.filte
 // --- Site news, careers page and the at-a-glance summary ---------------------------------
 const aW = by(w1, '910000063');
 const newsA = aW.claims.filter((c) => c.field === 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).sort();
-check(newsA.join('|') === '2025-03-03 Vi flytter til nye lokaler|2026-06-01 Alpha lanserer ny plattform|2026-08-10 Ny styreleder valgt|2026-09-05 Vi åpner kontor i Tromsø|2026-09-15 Ny avtale med Bergen kommune', `site news: dated posts only, publish date not "updated" date; menu labels, archive, product pages, the listing's own data, modified-only dates and a neighbour's date left out (got ${newsA.join('|')})`);
+check(newsA.join('|') === '2025-03-03 Vi flytter til nye lokaler|2026-06-01 Alpha lanserer ny plattform|2026-08-10 Ny styreleder valgt|2026-09-05 Vi åpner kontor i Tromsø|2026-09-15 Ny avtale med Bergen kommune|2026-10-14 Alpha åpner avdeling i Trondheim', `site news: dated posts only, publish date not "updated" date; menu labels, archive, product pages, the listing's own data, modified-only dates and a neighbour's date left out (got ${newsA.join('|')})`);
 check(aW.claims.filter((c) => c.field === 'site_news').every((c) => c.source_date && c.family === 'public_activity'), 'site news: each item is dated public activity');
+check(aW.evidence.some((e) => e.source_url === 'https://www.alpha-test.no/feed/') && !JSON.stringify(aW.claims).includes('prisliste') && !JSON.stringify(aW.claims).includes('partner.example.com') && !JSON.stringify(aW.claims).includes('Kommentar') && !JSON.stringify(aW.claims).includes('/produkt/'), "site feed: posts read with their RSS publish date; an item with only an updated date, another site's post, a shop page, an old post and the comment feed left out; a post already on the news page counted once");
+const newsB = by(w1, '910000098').claims.filter((c) => c.field === 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`);
+check(newsB.join('|') === '2026-08-01 Nye kontorlokaler ledige i sentrum', `site feed: an Atom entry dated by <published>, never <updated>; an entry with only <updated> left out (got ${newsB.join('|')})`);
 const jobsA = aW.claims.filter((c) => c.field === 'site_job').map((c) => (c.value as any).title).sort();
 check(jobsA.join('|') === 'Backend-utvikler|Designer|Driftstekniker|Prosjektleder', `jobs: single ads whose hiring organisation is this company (by name or organisation number); sister company's ad, parent's posting, posting without employer, posting without its own ad page, FINN and NAV searches, expired data and the site's own pages left out (got ${jobsA.join('|')})`);
 check(aW.claims.filter((c) => c.field === 'site_job').every((c) => (c.value as any).hiring_organisation && /^https:\/\/(alphatest\.teamtailor\.com\/jobs\/\d+-|www\.alpha-test\.no\/karriere\/.+)/.test((c.value as any).url)), 'jobs: each ad names its hiring organisation and points to the single ad, never to the careers landing page');
 check(!aW.claims.some((c) => c.field === 'site_job' && String((c.value as any).url).includes('11111111-1111')), 'careers page: a link to a NAV ad already attached is not counted twice');
 check(!aW.claims.some((c) => c.field === 'careers_page') && !aW.summary.text.includes('careers page') && aW.availability.job_postings.checked_sources.includes('company_website'), 'jobs: a careers landing page is not published as a job; the website is recorded as checked');
 check(aW.summary.statements[0]?.text.startsWith('At a glance: TESTSELSKAP ALPHA AS is a private limited company (AS) in Oslo') && aW.summary.text.includes('up 16% on 2024') && aW.summary.text.includes('it is hiring'), 'summary: at-a-glance line with form, place, revenue trend and hiring');
-check(aW.summary.text.includes('Latest news on its website: 2026-09-15 "Ny avtale med Bergen kommune"') && aW.summary.text.includes('job ads for this company linked from its website'), 'summary: latest site news and job ads from the website');
+check(aW.summary.text.includes('Latest news on its website: 2026-10-14 "Alpha åpner avdeling i Trondheim"') && aW.summary.text.includes('job ads for this company linked from its website'), 'summary: latest site news and job ads from the website');
 check(by(w1, '910000098').summary.statements[0]?.text.startsWith('At a glance: TESTSELSKAP BETA AS is a private limited company (AS) in Bergen'), 'summary: at-a-glance line for a sparse profile');
 // Builderr audit: the website must be the company's own (not a group, chain or brand site), and
 // nothing is read from a site that is not.
@@ -221,11 +228,19 @@ check(!wc('910000896', 'site_news').length && wa('910000896').official_website.s
 const aW3 = by(w3, '910000063');
 check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news'), 'website down: no false removals of site news or job ads');
 
+// --- Quality checks catch a bad envelope ----------------------------------------------------
+const badEnv = JSON.parse(JSON.stringify(by(w1, '910000063'))) as Envelope;
+badEnv.claims[0].evidence_ids = ['ev:missing'];
+badEnv.availability.official_website = { state: 'not_available', reason: 'registered_website_not_verified', checked_sources: [] };
+const badQ = qualityReport([badEnv]);
+check(!badQ.all_checks_passed && badQ.checks.claims_without_evidence === 1 && badQ.checks.website_facts_without_a_verified_website === 1, 'quality checks: a claim with missing evidence and website facts without a verified website are caught');
+
 // --- Website helpers --------------------------------------------------------------------
 check([...findOrgnrs('Org.nr. 810 034 882 MVA').keys()].join() === '810034882' && findOrgnrs('Ring 810034882').size === 0 && findOrgnrs('Oslo, Norge 810034882').size === 0, 'helpers: organisation numbers only counted where presented as such');
 check(normalizeSocial('https://no.linkedin.com/in/ola-nordmann') === null && normalizeSocial('https://www.facebook.com/sharer/sharer.php?u=x') === null && normalizeSocial('https://www.facebook.com/wix') === null, 'helpers: personal, share and vendor links rejected');
 check(['brunvoll6021|BRUNVOLL AS', 'certego-norge|CERTEGO AS', 'FlexiformAS|FLEXIFORM AS', 'flexiform.no|FLEXIFORM AS', 'christie-nordang-as|CHRISTIE NORDANG AS', 'bertelosteen|BERTEL O. STEEN AS'].every((x) => handleMatchesName(x.split('|')[0], x.split('|')[1])), 'helpers: company handles matched (legal form, country, digits and initials allowed)');
 check(!['kappagruppen|KAPPA BYGG AS', 'kappa|KAPPA BYGG AS', 'nordicgroup|NORDIC AS', 'nordicwebagency|NORDIC AS', 'webbyraa|TESTSELSKAP ALPHA AS', 'alpha-test|TESTSELSKAP ALPHA AS', 'testselskap-alpha-eiendom|TESTSELSKAP ALPHA AS'].some((x) => handleMatchesName(x.split('|')[0], x.split('|')[1])), 'helpers: parent group, sister company, agency and brand handles rejected');
+check(JSON.stringify(feedItems('<rss><channel><lastBuildDate>Thu, 22 Oct 2026 09:00:00 +0000</lastBuildDate><item><title><![CDATA[A &amp; B]]></title><link>https://x.no/a</link><pubDate>Wed, 14 Oct 2026 08:00:00 +0000</pubDate></item><item><title>C</title><link>https://x.no/c</link><atom:updated>2026-10-20</atom:updated></item></channel></rss>')) === JSON.stringify([{ title: 'A & B', url: 'https://x.no/a', date: '2026-10-14' }, { title: 'C', url: 'https://x.no/c', date: null }]), 'helpers: feed items dated by pubDate; lastBuildDate and updated dates never used');
 check(publishedDate('<p>Publisert 05.09.2026 · Oppdatert 01.10.2026</p>') === '2026-09-05' && publishedDate('<time class="updated" datetime="2026-10-15">15.10.2026</time>') === null && publishedDate('<p>Sist endret 3. mars 2026</p>') === null && publishedDate('<time datetime="2026-02-01">1. feb</time>') === '2026-02-01', 'helpers: publish date read; updated or modified dates ignored');
 check(otherEntities([{ title: 'Kappa Gruppen', text: 'Kappa Gruppen består av Kappa Bygg AS, Kappa Elektro AS og Kappa Eiendom AS.\n© Kappa Gruppen AS' }], 'KAPPA BYGG AS').length === 3 && otherEntities([{ title: 'Iota', text: 'Copyright © 2026 Iota Handel og Service AS – alle rettigheter reservert' }], 'IOTA HANDEL OG SERVICE AS').length === 0, 'helpers: other companies named on a page counted (the company itself not)');
 const brandVerdict = (title: string, text: string, scoped = false) => ({ status: 'exact', scoped, candidate: { domain: 'treteam.no' }, pages: [{ title, text, links: [], sameAs: [] }] }) as any;

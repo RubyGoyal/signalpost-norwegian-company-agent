@@ -592,8 +592,8 @@ function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome):
         'job_postings',
         'site_job',
         `site#${j.url}#${j.title}`,
-        { title: j.title, url: j.url, listed_on: j.listed_on, ...(j.hiring_organisation ? { hiring_organisation: j.hiring_organisation } : {}), ...(j.posted ? { posted: j.posted } : {}), ...(j.expires ? { expires: j.expires } : {}) },
-        `job ad (${j.via}): "${j.title}", hiring organisation ${j.hiring_organisation ?? 'this company'}`,
+        { title: j.title, url: j.url, listed_on: j.listed_on, ...(j.hiring_organisation ? { hiring_organisation: j.hiring_organisation } : {}), ...(j.hiring_organisation_number ? { hiring_organisation_number: j.hiring_organisation_number } : {}), ...(j.posted ? { posted: j.posted } : {}), ...(j.expires ? { expires: j.expires } : {}) },
+        `job ad (${j.via}): "${j.title}", hiring organisation ${j.hiring_organisation ?? `organisation number ${j.hiring_organisation_number}`}`,
         { sourceDate: j.posted, confidence: 0.85 }
       );
   }

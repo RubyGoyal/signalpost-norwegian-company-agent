@@ -53,6 +53,8 @@ export interface PageAnalysis {
   mailto: string[];
   tel: string[];
   sameAs: string[];
+  /** News feeds the page declares (<link rel="alternate" type="application/rss+xml">), comment feeds left out. */
+  feeds?: string[];
   parked: boolean;
 }
 
@@ -348,7 +350,7 @@ export function analyzePage(page: WebPage): PageAnalysis {
   const orgnrs = findOrgnrs(`${text}\n${ldText.join('\n')}`);
   const lower = `${title} ${text.slice(0, 3000)}`.toLowerCase();
   const parked = PARKED_MARKERS.some((p) => lower.includes(p)) && text.length < 4000;
-  return { url: page.url, snapshot: page.snapshot, title, siteNames, text, orgnrs, links, mailto, tel, sameAs, parked };
+  return { url: page.url, snapshot: page.snapshot, title, siteNames, text, orgnrs, links, mailto, tel, sameAs, feeds: feedLinks(html, base), parked };
 }
 
 // ---------------------------------------------------------------------------
@@ -823,6 +825,83 @@ const ATS_BRAND = /^(teamtailor|webcruiter|jobbnorge|recman|hr ?manager|jobylon|
 // An ad page that says the position is filled or closed.
 const CLOSED_AD = /(stillingen er (ikke lenger|ikke) (aktiv|ledig|tilgjengelig)|annonsen er (utl[oø]pt|ikke lenger aktiv)|s[oø]knadsfristen (er|har) (g[aå]tt ut|utl[oø]pt|passert)|no longer (active|available|accepting)|this (job|position|ad) (is|has been) (closed|filled|expired)|position (has been )?filled|job (has )?expired)/i;
 
+/** Feeds a page declares in its head; comment feeds are not news. */
+function feedLinks(html: string, base: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+    const rel = (attr(m[0], 'rel') || '').toLowerCase();
+    const type = (attr(m[0], 'type') || '').toLowerCase();
+    const href = attr(m[0], 'href');
+    if (!href || !/\balternate\b/.test(rel) || !/(rss|atom)\+xml/.test(type)) continue;
+    if (/comment|kommentar/i.test(`${href} ${attr(m[0], 'title') || ''}`)) continue;
+    try {
+      out.push(new URL(href, base).href);
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
+}
+
+/** The site's own news feed: on the verified site's domain, not a comment or product feed. */
+function pickFeed(urls: string[], domain: string): string | null {
+  for (const raw of urls) {
+    let u: URL;
+    try {
+      u = new URL(raw);
+    } catch {
+      continue;
+    }
+    if (!/^https?:$/.test(u.protocol) || registrableDomain(u.hostname) !== domain) continue;
+    if (/comment|kommentar|product|produkt|post_type=/i.test(u.pathname + u.search)) continue;
+    return u.href;
+  }
+  return null;
+}
+
+const xmlText = (block: string, name: string): string | null => {
+  const m = block.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, 'i'));
+  if (!m) return null;
+  const inner = m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+  return decodeEntities(inner.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+};
+
+/**
+ * Items of an RSS or Atom feed with their publish date: RSS <pubDate> (or <dc:date>), Atom
+ * <published>. Atom <updated>, RSS <lastBuildDate> and similar change dates are never used, so
+ * an item without a publish date has no date.
+ */
+export function feedItems(xml: string): { title: string; url: string | null; date: string | null }[] {
+  const out: { title: string; url: string | null; date: string | null }[] = [];
+  for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+    const b = m[1];
+    const pub = xmlText(b, 'pubDate') ?? xmlText(b, 'dc:date');
+    const guid = b.match(/<guid\b[^>]*isPermaLink\s*=\s*["']true["'][^>]*>([^<]+)<\/guid>/i)?.[1]?.trim() ?? null;
+    out.push({ title: xmlText(b, 'title') || '', url: xmlText(b, 'link') || guid, date: pub ? parseDate(pub) : null });
+  }
+  for (const m of xml.matchAll(/<entry\b[^>]*>([\s\S]*?)<\/entry>/gi)) {
+    const b = m[1];
+    const pub = xmlText(b, 'published');
+    const link = [...b.matchAll(/<link\b[^>]*>/gi)].map((x) => x[0]).find((t) => !/\brel\s*=/i.test(t) || /\brel\s*=\s*["']alternate["']/i.test(t));
+    out.push({ title: xmlText(b, 'title') || '', url: link ? attr(link, 'href') : null, date: pub ? parseDate(pub) : null });
+  }
+  return out;
+}
+
+/** A post's address on the verified site (not the front page, a listing, a shop page or a file). */
+function sitePostUrl(raw: string, base: string, domain: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(raw, base);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(u.protocol) || registrableDomain(u.hostname) !== domain) return null;
+  const path = u.pathname.replace(/\/$/, '');
+  if (!path || NOT_A_POST_PATH.test(path) || /\.(pdf|jpe?g|png|gif|svg|zip|docx?|xlsx?|mp4|xml)$/i.test(path) || /\/feed$/i.test(path)) return null;
+  return `${u.origin}${u.pathname}`;
+}
+
 export interface SiteNewsItem { date: string; title: string; url: string; snapshot: SourceSnapshot; via: string }
 export interface SiteJob {
   title: string;
@@ -831,6 +910,8 @@ export interface SiteJob {
   expires: string | null;
   listed_on: string;
   hiring_organisation: string | null;
+  /** Set when the ad gives the hiring organisation's number (it is this company's). */
+  hiring_organisation_number: string | null;
   snapshot: SourceSnapshot;
   via: string;
 }
@@ -840,6 +921,8 @@ export interface SiteActivity {
   newsChecked: boolean;
   /** Why the page behind the news link was not read as news (a shop's "Nyheter" lists new products). */
   newsPageSkipped?: string;
+  /** The site's own news feed that was read. */
+  newsFeed?: string;
   /** The careers page that was read (a landing page, never published as an opening). */
   careersPage: string | null;
   careersChecked: boolean;
@@ -1043,6 +1126,17 @@ export async function readSiteActivity(
   const today = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
   const sinceDay = since.slice(0, 10);
 
+  // News: dated items on the site's news page, then the site's own declared feed. Every post needs
+  // its publish date; titles that are menu or paging labels are not posts.
+  const seen = new Set<string>();
+  const add = (date: string | null, title: string, url: string, via: string, snapshot: SourceSnapshot) => {
+    if (!date || date < sinceDay || date > today || seen.has(url)) return;
+    const t = title.replace(/[\s\u00a0]+/g, ' ').replace(/^[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+|[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+$/g, '').trim();
+    if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t) || NEWS_NAV_LABEL.test(t)) return;
+    seen.add(url);
+    act.news.push({ date, title: t, url, snapshot, via });
+  };
+  let newsPageFeeds: string[] = [];
   const newsUrl = findSectionLink(verdict.pages, domain, NEWS_PATH, NEWS_TEXT);
   if (!newsUrl) act.newsChecked = true;
   else if (!signal?.aborted) {
@@ -1054,6 +1148,7 @@ export async function readSiteActivity(
       if (isShopListing(html)) act.newsPageSkipped = 'product_listing';
       else {
         act.newsPage = r.page.url;
+        newsPageFeeds = feedLinks(html, r.page.url);
         const listPath = new URL(r.page.url).pathname.replace(/\/$/, '');
         const postUrl = (raw: string): string | null => {
           let u: URL;
@@ -1070,17 +1165,9 @@ export async function readSiteActivity(
           if (NOT_A_POST_PATH.test(under ? path.slice(listPath.length) : path) || /\.(pdf|jpe?g|png|gif|svg|zip|docx?|xlsx?|mp4)$/i.test(path)) return null;
           return `${u.origin}${u.pathname}`;
         };
-        const seen = new Set<string>();
-        const add = (date: string | null, title: string, url: string, via: string) => {
-          if (!date || date < sinceDay || date > today || seen.has(url)) return;
-          const t = title.replace(/[\s\u00a0]+/g, ' ').replace(/^[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+|[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+$/g, '').trim();
-          if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t) || NEWS_NAV_LABEL.test(t)) return;
-          seen.add(url);
-          act.news.push({ date, title: t, url, snapshot: r.page.snapshot, via });
-        };
         for (const a of articleNodes(html)) {
           const url = a.url ? postUrl(a.url) : null;
-          if (url) add(a.date, a.title, url, 'structured data');
+          if (url) add(a.date, a.title, url, 'structured data', r.page.snapshot);
         }
         const items = anchorsWithPos(html, r.page.url).flatMap((a) => {
           const url = postUrl(a.url);
@@ -1097,13 +1184,27 @@ export async function readSiteActivity(
             const h = block.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
             if (h) title = stripTags(h);
           }
-          add(publishedDate(block), title, a.url, 'news page link');
+          add(publishedDate(block), title, a.url, 'news page link', r.page.snapshot);
         }
-        act.news.sort((x, y) => y.date.localeCompare(x.date) || x.url.localeCompare(y.url));
-        act.news = act.news.slice(0, 10);
       }
     }
   }
+  // The feed the news page or the homepage declares (a news category's own feed first). Only the
+  // publish date of each item is used.
+  const feedUrl = pickFeed([...newsPageFeeds, ...verdict.pages.flatMap((p) => p.feeds ?? [])], domain);
+  if (feedUrl && !signal?.aborted) {
+    const f = await web.getPage(feedUrl, `${snapPrefix}:feed`, signal, 'feed');
+    act.snapshots.push(f.outcome === 'ok' ? f.page.snapshot : f.snapshot);
+    if (f.outcome === 'ok') {
+      act.newsFeed = f.page.url;
+      for (const it of feedItems(f.page.html)) {
+        const url = it.url ? sitePostUrl(it.url, f.page.url, domain) : null;
+        if (url) add(it.date, it.title, url, 'news feed (publish date)', f.page.snapshot);
+      }
+    }
+  }
+  act.news.sort((x, y) => y.date.localeCompare(x.date) || x.url.localeCompare(y.url));
+  act.news = act.news.slice(0, 10);
 
   const careersUrl = findSectionLink(verdict.pages, domain, CAREERS_PATH, CAREERS_TEXT);
   if (!careersUrl) act.careersChecked = true;
@@ -1117,7 +1218,7 @@ export async function readSiteActivity(
       const push = (j: JobNode, url: string, snapshot: SourceSnapshot, via: string) => {
         if (seen.has(url)) return;
         seen.add(url);
-        act.jobs.push({ title: j.title, url, posted: j.posted, expires: j.expires, listed_on: new URL(url).hostname, hiring_organisation: j.org, snapshot, via });
+        act.jobs.push({ title: j.title, url, posted: j.posted, expires: j.expires, listed_on: new URL(url).hostname, hiring_organisation: j.org, hiring_organisation_number: j.orgIds.includes(id.orgnr) ? id.orgnr : null, snapshot, via });
       };
       // 1. Job postings described on the careers page itself, for this company only.
       // Each must link to its own ad: the careers page itself is a landing page, not a job.

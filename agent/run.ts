@@ -14,6 +14,7 @@ import { BrregClient } from './brreg.ts';
 import { readInput } from './input.ts';
 import { NavJobIndex, type JobIndexInfo } from './jobs.ts';
 import { assembleCompany, failedEnvelope, gatherCompany, type Gathered, type RunContext } from './profile.ts';
+import { qualityReport } from './quality.ts';
 import { WebClient } from './web.ts';
 import { FIELD_FAMILIES, type Envelope } from './types.ts';
 
@@ -187,6 +188,7 @@ async function main() {
       states,
       companies_with_family_available: familyAvailable,
       official_website_outcomes: websiteHow,
+      quality: qualityReport(ordered),
       total_claims: ordered.reduce((n, e) => n + e.claims.length, 0),
       refresh_changes_detected: changes,
       requests_total: requestsTotal,
@@ -205,6 +207,7 @@ async function main() {
       nav_job_feed: jobsInfo,
     };
     await fs.writeFile(path.join(outDir, 'run-report.json'), JSON.stringify(report, null, 2));
+    process.stderr.write(`signalpost: quality checks ${report.quality.all_checks_passed ? 'passed' : `found ${report.quality.issues} issue(s), see run-report.json`}\n`);
     process.stdout.write(
       JSON.stringify({
         run_id: runId,

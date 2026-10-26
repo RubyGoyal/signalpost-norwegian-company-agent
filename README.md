@@ -4,6 +4,19 @@ Signalpost takes Norwegian organisation numbers and returns one result envelope 
 
 Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/signalpost).
 
+## What's new in version 4
+
+Builderr's audit of version 3 asked for four fixes. Each one is now a rule in the agent, an offline test, and a result on real company websites.
+
+| Builderr's point | What the agent does now | Offline test | On real sites |
+|---|---|---|---|
+| The website must be the company's own, not a parent group or brand site | A website, registered or found, is published only when it shows this company's organisation number or exact name. Group, parent, manager, chain and brand sites are left out, with the reason given, and nothing on them is used. A registered page on a group's site is verified as that page only. | Group site naming several companies, chain site showing the chain's number, brand site, company page on a group site | 31 of the 108 websites registered for the 1,000-company sample are group, parent, manager, chain or brand sites (REMA 1000, OBOS, NorgesGruppen Eiendom and others) and are no longer published; 47 are verified as the company's own |
+| Social links must match this company | An account is published only when its handle is the company's name, or the name of its own verified domain when no other company on the site has that name | Parent-group, sister-company, web-agency and theme accounts in a footer | National Red Cross accounts not used for Oslo Røde Kors; a parent's account on treteam.no left out |
+| News must be real, dated posts | The publish date is read from the post's own block or the site's feed (`pubDate`, `published`); "updated" and "modified" dates are never used. Menu labels, archives, product pages and a shop's "Nyheter" are not news. | "Se flere nyheter", product card, updated-only dates, a neighbour's date, feed `<updated>` | Real dated posts kept (for example 5 on floya.no), product and menu links left out |
+| Jobs must be single ads for this company | Only single ads count: NAV ads by organisation number, and ads whose hiring organisation (structured data or the ad's title) is this company. The careers landing page, NAV and FINN searches and the parent's vacancies are left out. | Careers landing page, FINN and NAV searches, a sister company's ad, the parent's posting, a closed ad | Homely's Jobylon ads found, with Homely as the employer |
+
+Also new: staff members' own email addresses and phone numbers are no longer taken from websites (only role addresses such as post@ and the main number). Every `run-report.json` now has a `quality` section: what was published, what was left out and why, and checks that every claim has evidence and that nothing comes from an unverified website. Details of the real-site check are in [`examples/live-test-v4-report.json`](examples/live-test-v4-report.json).
+
 ## Run it
 
 Requires Node.js 22.12 or later.
@@ -20,7 +33,7 @@ npx tsx agent/run.ts <input-file> out
   - No row is dropped silently: a value with digits that is not a valid organisation number gets its own `failed` envelope (`invalid_organisation_number`). Only rows with no digits (headers, blank cells) are skipped, and they are counted in the run report.
 - **Output:**
   - `out/envelopes.jsonl`: exactly one terminal envelope per input organisation number, in input order.
-  - `out/run-report.json`: counts by state, requests, runtime (p50/p95) and cost.
+  - `out/run-report.json`: counts by state, requests, runtime (p50/p95) and cost, plus a `quality` section (what was published and left out, and integrity checks; see below).
 - **Stdout:** a single JSON line summarising the run. Progress goes to stderr.
 - **Shortcut:** numbers can be passed directly, for example `npx tsx agent/run.ts 923609016,984851006 out`.
 
@@ -68,7 +81,7 @@ Optional flags and environment variables:
 - Contact points: registered company email and phone, plus role email addresses (post@, salg@ ...) and the main phone number from the verified website's own domain (never staff members' own details, and nothing for sole proprietorships)
 - Group structure
 - **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units (including ads posted under a brand name). Also single job ads linked from the verified website's careers page, when the ad names this company as the hiring organisation.
-- **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated posts from the verified website's news page.
+- **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated posts from the verified website's news page and its own news feed.
 
 ## Rules the agent follows
 
@@ -86,7 +99,7 @@ Optional flags and environment variables:
   The reason is given in the availability and in the summary. A registered website that cannot be read this time (robots.txt, bot protection or an outage) is kept only when its domain carries the company's name. A registered address that is a page on a larger site (`group.no/companies/this-one`) is verified as that page, and nothing else on that domain (news, jobs, emails) is used.
 - **Profiles only when the handle is this company's name.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name (give or take the legal form, a country word such as "norge", or digits), or the name of the company's own verified domain (its brand, as "agropumper" on agropumper.no). The domain rule is not used on a page of someone else's site, for a domain with a group word, or when another company named on the site has that name. A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out. Share buttons and personal profiles are ignored.
 - **Contacts without personal data.** Email links are taken only on the site's own domain and only for role addresses (post@, salg@, kundeservice@ and similar), never a staff member's own address. Only the site's main phone number is taken.
-- **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page (never a neighbour's) or its structured data. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
+- **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page (never a neighbour's), its structured data (`datePublished`), or the site's own declared feed (RSS `pubDate`, Atom `published`). Feed `lastBuildDate` and `<updated>` are never used, and comment feeds, product feeds and posts on other sites are left out. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
 - **Jobs are single ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title; closed ads are left out), and structured `JobPosting` data that links to its own ad and names this company. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications and expired or undated postings are left out.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
@@ -100,7 +113,7 @@ Optional flags and environment variables:
 | Regnskapsregisteret (accounts) | `https://data.brreg.no/regnskapsregisteret/regnskap/{orgnr}` | NLOD 2.0 |
 | Enhetsregisteret (change log) | `https://data.brreg.no/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer={orgnr}` | NLOD 2.0 |
 | NAV job vacancy feed | `https://pam-stilling-feed.nav.no/api/v1/feed` and `/api/v1/feedentry/{uuid}` | [NAV API terms](https://arbeidsplassen.nav.no/vilkar-api): ads may be republished; inactive ads must be removed |
-| Company-owned websites | The company's own homepage, up to three contact, about or terms pages, its news and careers pages, and up to four single job ads its careers page links to on a recruiting platform (Teamtailor, Webcruiter, Jobbnorge and similar) | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
+| Company-owned websites | The company's own homepage, up to three contact, about or terms pages, its news and careers pages, the news feed it declares, and up to six single job ads its careers page links to on a recruiting platform (Teamtailor, Jobylon, Webcruiter, Jobbnorge and similar) | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
 
 **Registers and NAV.** Requests to these APIs go only to `data.brreg.no` and `pam-stilling-feed.nav.no`, over HTTPS. Any other host or a redirect off those hosts is refused in code (`ALLOWED_HOSTS` in `agent/brreg.ts`). Registry requests are rate-limited (default 8 concurrent) with retries and backoff on 429 and 5xx responses. Each company needs 5 or 6 registry requests: entity, roles, accounts, sub-units and change log.
 
@@ -110,10 +123,17 @@ Optional flags and environment variables:
 - Only `http` and `https`, default ports, and no credentials in the URL.
 - The host must resolve, and every address must be public. Loopback, private, link-local (including cloud metadata addresses), carrier-grade NAT, multicast and reserved ranges are refused. This is checked again on every redirect hop (at most 4).
 - `robots.txt` is honoured. A missing file allows access; one that cannot be fetched counts as a full disallow.
-- Only HTML is read, at most 1.5 MB per page and 8 seconds per request. A company gets at most a few pages and 20 seconds in total.
+- Only HTML pages and the site's own declared news feed are read, at most 1.5 MB per page and 8 seconds per request. A company gets at most a few pages and 20 seconds in total.
 - Social platforms, directory sites and FINN are never crawled.
 - A start-of-run probe and a circuit breaker turn the step off if the public web is unreachable. It is then reported as not checked, never as "no website".
 - Requests identify the agent with a `User-Agent` that links to this repository.
+
+## Quality report in every run
+
+`run-report.json` has a `quality` section, and stderr ends with `quality checks passed` (or the number of issues):
+- **Checks** (all should be 0): claims without evidence in their envelope, evidence without a source URL, retrieval time or content hash, duplicate claim IDs, website facts in an envelope whose website is not verified, news posts without a publish date, website job ads without a hiring organisation, summary statements citing missing evidence, and failed envelopes with claims.
+- **What was published:** claims by field family and by source class (official registry, official job board, company-owned), websites by how they were verified, and the profiles, dated news posts (and how many came from feeds), job ads, role email addresses and main phone numbers taken from company websites.
+- **What was left out and why:** websites not published, counted by reason (for example `registered_website_belongs_to_another_entity`).
 
 ## Models, APIs, cost and secrets
 
@@ -166,7 +186,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (119 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (125 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -179,9 +199,10 @@ The offline self-test (119 checks) runs against simulated registry, NAV and comp
 - profiles: only handles that are the company's name or its own domain's; the parent group's, a sister company's, the web agency's and the theme's accounts and share buttons left out; no false removals when a site is down or the web is unreachable
 - contacts: role addresses and the main phone number only; a staff member's own email and phone left out
 - the live check's cases: a title naming the company only as a whole, a thin homepage on the company's name domain, a front page redirecting deeper on the same site
-- news: dated posts only, with the publish date from the post's own block; "Se flere nyheter", archive, product cards, a shop's new-products page, modified-only dates and a neighbour's date left out
+- news: dated posts only, with the publish date from the post's own block or the site's feed (`pubDate`, Atom `published`, never `<updated>`); "Se flere nyheter", archive, product cards, a shop's new-products page, modified-only dates and a neighbour's date left out
 - jobs: single ads only, with the hiring organisation checked (structured data or the ad's title); the careers landing page, FINN and NAV searches, a sister company's ad, the parent's posting, closed ads, postings without an employer or their own ad page, and expired postings left out
 - summary: the at-a-glance line, including the revenue trend
+- run report: the quality section passes on every fixture and catches a claim with missing evidence or website facts without a verified website
 - input formats, unfamiliar column or key names, and malformed numbers
 
 ## Web app

@@ -6,7 +6,8 @@
 //     link-local, carrier-grade NAT, multicast or reserved ranges), checked again on
 //     every redirect hop;
 //   - robots.txt is honoured (RFC 9309: a missing file allows, an unreachable one disallows);
-//   - only HTML is read, capped in size and time; at most a few pages per site.
+//   - only HTML pages (and a site's own declared news feed) are read, capped in size and time;
+//     at most a few pages per site.
 // A circuit breaker turns the website step off for the rest of the run when the network
 // clearly cannot reach the public web, so a blocked network costs seconds, not minutes.
 
@@ -418,8 +419,8 @@ export class WebClient {
     return p;
   }
 
-  /** Fetches one HTML page, honouring robots.txt. Never throws. */
-  async getPage(url: string, snapshotId: string, signal?: AbortSignal): Promise<WebResult> {
+  /** Fetches one HTML page (or, with kind 'feed', an RSS/Atom news feed), honouring robots.txt. Never throws. */
+  async getPage(url: string, snapshotId: string, signal?: AbortSignal, kind: 'html' | 'feed' = 'html'): Promise<WebResult> {
     const now = () => new Date().toISOString();
     if (this.disabledReason) return { outcome: 'error', error: this.disabledReason, snapshot: this.snapshot(url, { retrieved_at: now(), error: this.disabledReason }, snapshotId) };
     try {
@@ -435,7 +436,8 @@ export class WebClient {
       }
       if (!robotsAllows(rules, shape.url.pathname + shape.url.search))
         return { outcome: 'blocked', error: 'robots_txt_disallows', snapshot: this.snapshot(url, { retrieved_at: now(), error: 'robots_txt_disallows' }, snapshotId) };
-      const r = await this.guardedGet(url, 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1', this.opts.maxBytes, signal);
+      const accept = kind === 'feed' ? 'application/rss+xml,application/atom+xml,application/xml;q=0.9,text/xml;q=0.9,*/*;q=0.1' : 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1';
+      const r = await this.guardedGet(url, accept, this.opts.maxBytes, signal);
       const retrieved = now();
       if (!r.ok) {
         const blocked = ['private_address', 'scheme_not_allowed', 'credentials_in_url', 'port_not_allowed', 'host_not_public', 'ip_literal_not_allowed'].includes(r.error);
@@ -457,7 +459,7 @@ export class WebClient {
         return { outcome: 'error', error: `http_${r.status}`, snapshot: this.snapshot(r.finalUrl.href, { retrieved_at: retrieved, http_status: r.status, error: `http_${r.status}` }, snapshotId) };
       if (r.tooBig || !r.bytes)
         return { outcome: 'error', error: 'page_too_large', snapshot: this.snapshot(r.finalUrl.href, { retrieved_at: retrieved, http_status: r.status, error: 'page_too_large' }, snapshotId) };
-      if (!/html/i.test(r.contentType))
+      if (!(kind === 'feed' ? /(rss|atom|xml)/i : /html/i).test(r.contentType))
         return { outcome: 'not_html', error: 'not_html', snapshot: this.snapshot(r.finalUrl.href, { retrieved_at: retrieved, http_status: r.status, error: 'not_html' }, snapshotId) };
       const sha = createHash('sha256').update(r.bytes).digest('hex');
       const html = decode(r.bytes, charsetOf(r.contentType, r.bytes));

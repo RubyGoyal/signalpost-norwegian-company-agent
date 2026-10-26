@@ -333,7 +333,7 @@ const DNS: Record<string, string> = {
 };
 const page = (title: string, body: string, head = '') =>
   `<!doctype html><html lang="no"><head><meta charset="utf-8"><title>${title}</title>${head}</head><body>${body}</body></html>`;
-type Site = { robots?: string; pages: Record<string, string | { redirect: string }> };
+type Site = { robots?: string; pages: Record<string, string | { redirect: string } | { feed: string; type: string }> };
 const WEB: Record<string, Site> = {
   'www.brreg.no': { robots: 'User-agent: *\nAllow: /\n', pages: {} },
   'www.alpha-test.no': {
@@ -353,7 +353,7 @@ const WEB: Record<string, Site> = {
          <a href="https://www.linkedin.com/company/testselskap-alpha-eiendom/">Alpha Eiendom</a>
          <a href="https://www.youtube.com/@flatsometheme">Tema: Flatsome</a>
          <a href="https://www.instagram.com/webbyraa/">Laget av Webbyr&aring;</a> <a href="mailto:hei@webbyraa.no">byr&aring;</a></footer>`,
-        '<meta property="og:site_name" content="Alpha Test"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Testselskap Alpha AS","sameAs":["https://www.linkedin.com/company/alpha-test/"]}</script>'
+        '<link rel="alternate" type="application/rss+xml" title="Testselskap Alpha &raquo; Kommentarer" href="/comments/feed/"><link rel="alternate" type="application/rss+xml" title="Testselskap Alpha &raquo; Feed" href="https://www.alpha-test.no/feed/"><meta property="og:site_name" content="Alpha Test"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Testselskap Alpha AS","sameAs":["https://www.linkedin.com/company/alpha-test/"]}</script>'
       ),
       '/nyheter': page(
         'Nyheter – Testselskap Alpha',
@@ -375,6 +375,18 @@ const WEB: Record<string, Site> = {
          <a href="/nyheter?side=2">Neste</a>`,
         '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"NewsArticle","headline":"Alpha lanserer ny plattform","datePublished":"2026-06-01T08:00:00+02:00","url":"https://www.alpha-test.no/nyheter/ny-plattform"},{"@context":"https://schema.org","@type":"Article","headline":"Nyheter","datePublished":"2026-01-01","url":"https://www.alpha-test.no/nyheter"},{"@context":"https://schema.org","@type":"BlogPosting","headline":"Oppdatert artikkel om sikkerhet","dateModified":"2026-10-10","url":"https://www.alpha-test.no/nyheter/sikkerhet"}]</script>'
       ),
+      '/feed/': {
+        type: 'application/rss+xml; charset=UTF-8',
+        feed: `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Testselskap Alpha</title><lastBuildDate>Thu, 22 Oct 2026 09:00:00 +0000</lastBuildDate>
+          <item><title><![CDATA[Alpha åpner avdeling i Trondheim]]></title><link>https://www.alpha-test.no/2026/10/alpha-apner-trondheim/</link><pubDate>Wed, 14 Oct 2026 08:00:00 +0000</pubDate></item>
+          <item><title>Ny avtale med Bergen kommune</title><link>https://www.alpha-test.no/nyheter/ny-avtale-med-kommunen</link><pubDate>Tue, 15 Sep 2026 08:00:00 +0000</pubDate></item>
+          <item><title>Oppdatert prisliste for 2027</title><link>https://www.alpha-test.no/2026/10/prisliste/</link><atom:updated>2026-10-20T08:00:00Z</atom:updated></item>
+          <item><title>Gjesteinnlegg hos en partner</title><link>https://partner.example.com/alpha-gjest</link><pubDate>Mon, 12 Oct 2026 08:00:00 +0000</pubDate></item>
+          <item><title>Ny stol i nettbutikken</title><link>https://www.alpha-test.no/produkt/ny-stol/</link><pubDate>Mon, 12 Oct 2026 08:00:00 +0000</pubDate></item>
+          <item><title>Julebord for alle ansatte i 2024</title><link>https://www.alpha-test.no/2024/12/julebord/</link><pubDate>Fri, 13 Dec 2024 08:00:00 +0000</pubDate></item>
+        </channel></rss>`,
+      },
+      '/comments/feed/': { type: 'application/rss+xml', feed: '<rss><channel><item><title>Kommentar til: Ny avtale med Bergen kommune</title><link>https://www.alpha-test.no/nyheter/ny-avtale-med-kommunen#comment-1</link><pubDate>Wed, 21 Oct 2026 08:00:00 +0000</pubDate></item></channel></rss>' },
       '/karriere': page(
         'Karriere – Testselskap Alpha',
         `<h1>Jobb hos oss</h1>
@@ -401,7 +413,14 @@ const WEB: Record<string, Site> = {
   },
   'testselskap-beta.no': {
     pages: {
-      '/': page('Testselskap Beta AS | Bergen', '<p>Vi leier ut næringslokaler i Bergen sentrum. Ta kontakt for visning.</p><footer>Prøvevegen 2, 5003 Bergen</footer>'),
+      '/': page('Testselskap Beta AS | Bergen', '<p>Vi leier ut næringslokaler i Bergen sentrum. Ta kontakt for visning.</p><footer>Prøvevegen 2, 5003 Bergen</footer>', '<link rel="alternate" type="application/atom+xml" href="/atom.xml">'),
+      '/atom.xml': {
+        type: 'application/atom+xml',
+        feed: `<feed xmlns="http://www.w3.org/2005/Atom"><title>Testselskap Beta</title><updated>2026-10-20T10:00:00Z</updated>
+          <entry><title>Nye kontorlokaler ledige i sentrum</title><link rel="alternate" href="https://testselskap-beta.no/nytt/nye-lokaler"/><published>2026-08-01T10:00:00Z</published><updated>2026-10-01T10:00:00Z</updated></entry>
+          <entry><title>Endret visningstid i oktober</title><link href="https://testselskap-beta.no/nytt/visning"/><updated>2026-10-10T10:00:00Z</updated></entry>
+        </feed>`,
+      },
     },
   },
   'gamma-group.no': {
@@ -518,6 +537,7 @@ function webResponse(url: URL): Response {
   if (url.pathname === '/robots.txt') return site.robots ? new Response(site.robots, { status: 200, headers: { 'content-type': 'text/plain' } }) : new Response('not found', { status: 404 });
   const p = site.pages[url.pathname];
   if (!p) return new Response('<h1>404</h1>', { status: 404, headers: { 'content-type': 'text/html' } });
+  if (typeof p !== 'string' && 'feed' in p) return new Response(p.feed, { status: 200, headers: { 'content-type': p.type } });
   if (typeof p !== 'string') return new Response(null, { status: 301, headers: { location: p.redirect } });
   return html(p);
 }
