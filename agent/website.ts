@@ -1227,6 +1227,11 @@ export async function readSiteActivity(
   const seen = new Set<string>();
   const add = (date: string | null, title: string, url: string, via: string, snapshot: SourceSnapshot) => {
     if (!date || date < sinceDay || date > today || seen.has(url)) return;
+    // A post address that carries its own date (/2026/03/27/...) must agree with the date found
+    // (a day apart allowed for time zones): a card's other date, such as an event's, is not when
+    // the post was published.
+    const inUrl = url.match(/\/(20\d\d)\/([01]\d)\/([0-3]\d)\//);
+    if (inUrl && Math.abs(Date.parse(`${inUrl[1]}-${inUrl[2]}-${inUrl[3]}`) - Date.parse(date)) > 864e5) return;
     const t = title.replace(/[\s\u00a0]+/g, ' ').replace(/^[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+|[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+$/g, '').trim();
     if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t) || NEWS_NAV_LABEL.test(t)) return;
     seen.add(url);
@@ -1285,10 +1290,33 @@ export async function readSiteActivity(
       }
     }
   }
-  // Dated posts the homepage itself shows ("Siste nytt" cards), when no news page gave any: only
+  const home = verdict.pages[0];
+  // The feed the news page or the homepage declares (a news category's own feed first). When none
+  // is declared, the standard feed address of the common site builders is tried once (WordPress
+  // "/feed/" under the news page or at the root, Wix "/blog-feed.xml"). Only the publish date of
+  // each item is used.
+  const declared = pickFeed([...newsPageFeeds, ...verdict.pages.flatMap((p) => p.feeds ?? [])], domain);
+  const origin = home ? new URL(home.url).origin : `https://${domain}`;
+  const probes = declared
+    ? [declared]
+    : [act.newsPage && new URL(act.newsPage).pathname.length > 1 ? `${act.newsPage.replace(/[?#].*$/, '').replace(/\/$/, '')}/feed/` : null, `${origin}/feed/`, `${origin}/blog-feed.xml`].filter((x): x is string => !!x).slice(0, 2);
+  for (const [i, feedUrl] of probes.entries()) {
+    if (signal?.aborted || act.newsFeed) break;
+    const f = await web.getPage(feedUrl, `${snapPrefix}:feed${i ? `:${i}` : ''}`, signal, 'feed');
+    // A probe that finds nothing is not a source; a declared feed is recorded either way.
+    if (declared || f.outcome === 'ok') act.snapshots.push(f.outcome === 'ok' ? f.page.snapshot : f.snapshot);
+    if (f.outcome !== 'ok') continue;
+    const its = feedItems(f.page.html);
+    if (!declared && !its.length) continue;
+    act.newsFeed = f.page.url;
+    for (const it of its) {
+      const url = it.url ? sitePostUrl(it.url, f.page.url, domain) : null;
+      if (url) add(it.date, it.title, url, declared ? 'news feed (publish date)' : 'news feed at the standard address (publish date)', f.page.snapshot);
+    }
+  }
+  // Dated posts the homepage itself shows ("Siste nytt" cards), when neither the news page nor the feed gave any: only
   // links to post addresses on the site (/nyheter/..., /aktuelt/..., /2026/10/...) whose card
   // carries a publish date.
-  const home = verdict.pages[0];
   if (!act.news.length && home?.html && !act.newsPageSkipped && !isShopListing(home.html)) {
     const postUrl = (raw: string): string | null => {
       let u: URL;
@@ -1323,29 +1351,6 @@ export async function readSiteActivity(
         if (h) title = stripTags(h);
       }
       add(publishedDate(block), title, a.url, 'homepage news link', home.snapshot);
-    }
-  }
-  // The feed the news page or the homepage declares (a news category's own feed first). When none
-  // is declared, the standard feed address of the common site builders is tried once (WordPress
-  // "/feed/" under the news page or at the root, Wix "/blog-feed.xml"). Only the publish date of
-  // each item is used.
-  const declared = pickFeed([...newsPageFeeds, ...verdict.pages.flatMap((p) => p.feeds ?? [])], domain);
-  const origin = home ? new URL(home.url).origin : `https://${domain}`;
-  const probes = declared
-    ? [declared]
-    : [act.newsPage && new URL(act.newsPage).pathname.length > 1 ? `${act.newsPage.replace(/[?#].*$/, '').replace(/\/$/, '')}/feed/` : null, `${origin}/feed/`, `${origin}/blog-feed.xml`].filter((x): x is string => !!x).slice(0, 2);
-  for (const [i, feedUrl] of probes.entries()) {
-    if (signal?.aborted || act.newsFeed) break;
-    const f = await web.getPage(feedUrl, `${snapPrefix}:feed${i ? `:${i}` : ''}`, signal, 'feed');
-    // A probe that finds nothing is not a source; a declared feed is recorded either way.
-    if (declared || f.outcome === 'ok') act.snapshots.push(f.outcome === 'ok' ? f.page.snapshot : f.snapshot);
-    if (f.outcome !== 'ok') continue;
-    const its = feedItems(f.page.html);
-    if (!declared && !its.length) continue;
-    act.newsFeed = f.page.url;
-    for (const it of its) {
-      const url = it.url ? sitePostUrl(it.url, f.page.url, domain) : null;
-      if (url) add(it.date, it.title, url, declared ? 'news feed (publish date)' : 'news feed at the standard address (publish date)', f.page.snapshot);
     }
   }
   act.news.sort((x, y) => y.date.localeCompare(x.date) || x.url.localeCompare(y.url));

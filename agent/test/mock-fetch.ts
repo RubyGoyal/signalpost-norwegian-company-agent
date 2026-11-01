@@ -508,6 +508,7 @@ Object.assign(WEB, {
            <article><a href="/aktuelt/nytt-kontor-i-arendal"><h3>Nytt kontor i Arendal</h3></a><p>Publisert 12.09.2026</p></article>
            <article><a href="/aktuelt/sommerjobber-2026"><h3>Sommerjobber for studenter</h3></a></article>
            <article><a href="/tjenester/bemanning"><h3>Bemanning for industrien</h3></a><p>12.09.2026</p></article>
+           <article><a href="/2026/03/27/paskeferie-2026/"><h3>Påskeferie 2026 for kontoret</h3></a><p>06.04.2026</p></article>
          </section>`
       ),
     },
