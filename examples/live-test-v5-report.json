@@ -1,0 +1,70 @@
+{
+  "description": "Live check of the version 5 rules (Builderr's feedback on the latest run: live job openings only, profiles for this exact company, more dated news from the company's own site) on the registered websites of the same 1,000-company sample (examples/smoke-1000.txt). The 45 registered websites that version 4 already leaves out (group, chain, manager, parked and similar sites), or that block outside scripts, were not re-run.",
+  "run_date": "2026-11-01",
+  "commit_tested": "4c1f2c111c1d7d8b1e20fab2836626287a7d83ea",
+  "how_it_was_run": "As for version 4: agent/website.ts, agent/web.ts and agent/orgnr.ts were downloaded from GitHub at the tested commit, checked by SHA-256 and run in a browser tab on each company's own site, with the company's identity from Enhetsregisteret. The agent's own functions decided the website, the social accounts, the dated news posts and the job ads. robots.txt was honoured.",
+  "sites": {
+    "re_run": 63,
+    "verified_as_the_companys_own_site": 46,
+    "kept_as_registered_but_unreadable": 1,
+    "did_not_load": 15,
+    "not_re_run": 1
+  },
+  "jobs": {
+    "careers_pages_read": 8,
+    "careers_pages_saying_no_open_positions": [
+      "913416988 INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE: \"Vi har for tiden ingen ledige stillinger\" (no job ads taken)",
+      "871545472 FORENINGEN FOR OMPLASSERING AV DYR FOD: \"Vi har for tiden ingen ledige stillinger\" (no job ads taken)"
+    ],
+    "other_careers_pages": [
+      "983807801 PERSONALTJENESTER TELEMARK AS: a staffing agency whose page lists vacancies at client companies, not at itself (none taken)",
+      "923971025 HAPRO AS: links to the whole Hapro group's list on Easycruit (none taken)",
+      "820227492 HOMELY AS: the three Jobylon ads found in the version 4 check are no longer on the page (none taken)",
+      "983351417 INVENTURA AS, 966419482 TRE TEAM ENTREPRENØR AS, 971277270 SAMFUNNSVITERNE: no single ad on the page (none taken)"
+    ],
+    "job_ads_published_from_websites": 0
+  },
+  "social": {
+    "profiles_published": 44,
+    "profiles_left_out": [
+      "ADVOKAT HELLELAND: https://facebook.com/advhelleland",
+      "ADVOKAT HELLELAND: https://x.com/oddmhelleland",
+      "EVASK AS: https://instagram.com/evask_stavanger",
+      "FORENINGEN FOR OMPLASSERING AV DYR FOD: https://facebook.com/FODOSLO",
+      "FORENINGEN FOR OMPLASSERING AV DYR FOD: https://instagram.com/fodoslo",
+      "FORENINGEN FOR OMPLASSERING AV DYR FOD: https://tiktok.com/@fodoslo",
+      "IDRETTSFORENINGEN FLØYA: https://instagram.com/floyaoffisiell",
+      "INVENTURA AS: https://facebook.com/InventuraBergenOslo",
+      "NORGEODESI AS: https://youtube.com/user/Norgeodesisupport",
+      "PERSONALTJENESTER TELEMARK AS: https://facebook.com/Personaltjenester",
+      "TRE TEAM ENTREPRENØR AS: https://facebook.com/treteam"
+    ],
+    "why_some_were_left_out": "A handle with an extra place or other word (fodoslo, evask_stavanger, InventuraBergenOslo, advhelleland), a bare-brand account for a unit whose legal name carries a place word (Personaltjenester for Personaltjenester Telemark AS), or a brand account on a site that names another company carrying the brand (treteam: Treteam AS; floyaoffisiell: Fløya Anlegg AS). These rules favour leaving out an account that may be right over publishing a parent's."
+  },
+  "news": {
+    "companies_with_dated_posts": 9,
+    "new_in_version_5": "871545472 FOD: 10 posts from its news page's feed at the standard WordPress address (/blog/feed/), which the site does not declare; 875758632 IF Fløya: one more post from /feed/."
+  },
+  "found_and_fixed_after_this_check": [
+    "819511012 INKERIA AS (lappeliten.no, a web shop): its feed is a product feed (channel 'Produkter', post_type=product), and 10 products were taken as news posts. Product feeds and product items are now left out, and prices written as '199 kr' count as prices (commit 0d7090f).",
+    "966419482 TRE TEAM ENTREPRENØR AS: a homepage card 'Påskeferie 2026' was dated 2026-04-06 (the date the office reopens), while its own address says 2026-03-27. The feed is now read before homepage cards, and a post whose address carries a date is published only with that date (commit cc064a8)."
+  ],
+  "not_tested": [
+    "984383878 ABILITY AS: certificate not trusted by the browser",
+    "979110928 DESIGN MAGIC AS: did not load",
+    "997125991 NORSKSNEKKER.NO AS: did not load",
+    "990427321 POSTNORD TERMINAL LANGHUS AS: did not load",
+    "911894955 MORTENSRUD MEDISINSKE SENTER AS: did not load",
+    "998049822 MUNDUR AS: did not load",
+    "989439200 DIN ØKONOMI AS: did not load",
+    "913424735 KAPITALSPIRE AS: did not load",
+    "912716481 FACING A CHILD STI: did not load",
+    "984192797 ORVAL AS: did not load",
+    "813340402 FURE STENSRUD AS: did not load",
+    "999553125 GRAVING OG SPRENGING AS: did not load",
+    "984356668 TRIKOTASJEHUSET AS: did not load",
+    "979684002 AMENDO GROUP AS: did not load",
+    "915340210 VEKSTJEGERNE AS: did not load"
+  ],
+  "hand_check": "A sample of 16 of these companies (12 drawn at random, and 4 whose careers pages the agent read) is on a hand-check page where Ruby Goyal marks each site, social, news and job item right or wrong herself; the results are reported in the README."
+}

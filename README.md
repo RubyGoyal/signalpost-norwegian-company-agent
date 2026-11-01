@@ -15,6 +15,12 @@ Builderr's feedback on the latest run named three fixes and one way to go furthe
 | News: only 1 item was found | More dated posts from the company's own verified site: posts shown on the homepage when there is no news page, and the site's feed at the standard address of the common site builders (WordPress `/feed/`, Wix `/blog-feed.xml`) when the site does not declare one. Every post still needs its publish date. A search of the press by company name was tested and left out on purpose (see "No press search" under the rules). | A dated "Siste nytt" card on the homepage (an undated card and a service page left out); an undeclared WordPress feed |
 | Flag what is new | Every summary now has a "What's new" line right after "At a glance": every dated fact from the past 12 months, newest first, each with its evidence (registry changes, annual accounts filed with the revenue change on the year before, board and CEO changes, new locations, name changes, status flags, job ads, website news). When nothing is dated it says so. On a re-run, it also counts the changes since the last check, which keep the previous value and evidence. The web app highlights this line. | Order, evidence and wording of the line; the empty case; the count of changes on a re-run |
 
+**On real sites** (1 November 2026, details in [`examples/live-test-v5-report.json`](examples/live-test-v5-report.json)): the new rules were run on 46 company websites that the agent verifies as the company's own.
+- Jobs: two careers pages say "Vi har for tiden ingen ledige stillinger" (Indre Kåfjord school, FOD), and no jobs were taken from them. A staffing agency's list of its clients' vacancies and a group-wide list on Easycruit were not taken either.
+- News: FOD's 10 posts came from its news page's feed at the standard WordPress address, which the site does not declare.
+- Two news errors were found and fixed: a web shop's product feed read as news (lappeliten.no), and a homepage card dated by the day an office reopens instead of its publish date (treteam.no).
+- A sample of these companies is being checked by hand by a person, item by item (see "Hand check" under Tests).
+
 ## What's new in version 4
 
 Builderr's audit of version 3 asked for four fixes. Each one is now a rule in the agent, an offline test, and a result on real company websites.
@@ -191,6 +197,16 @@ Details are in [`examples/live-test-v4-report.json`](examples/live-test-v4-repor
 
 Details of that test are in [`examples/live-test-v3-report.json`](examples/live-test-v3-report.json).
 
+**Live check of version 5 (1 November 2026):** the version 5 rules were re-run on the registered websites of the same 1,000 companies that version 4 publishes (63 sites; 46 verified as the company's own and read, 15 did not load).
+- Jobs: 8 careers pages read. Two say there are no open positions (Indre Kåfjord school, FOD), and no jobs were taken from them; a staffing agency's clients' vacancies and a group-wide list were not taken either. No single ad for these companies was on any of the pages.
+- Social: 44 accounts published. 11 were left out, for example a handle with a place word ("fodoslo") or a brand account on a site that names another company carrying the brand (Treteam AS). These rules leave out an account that may be right rather than publish a parent's.
+- News: dated posts for 9 companies, including 10 from a feed found at the standard WordPress address.
+- Found and fixed: a web shop's product feed read as news, and a homepage card dated by an office's reopening day instead of the post's publish date.
+
+Details are in [`examples/live-test-v5-report.json`](examples/live-test-v5-report.json).
+
+**Hand check:** a sample of the version 5 output is being checked by a person, not a model: 16 of the companies above (12 drawn at random, and 4 whose careers pages the agent read). For each website, social account, news post and job decision she opens the source and marks it right or wrong; accuracy by source type will be reported here. To draw such a sample from any run: `npx tsx scripts/handcheck-sample.ts out/envelopes.jsonl handcheck-sample.json 15`.
+
 To smoke-test against the live registry on a random sample of real companies:
 
 ```bash
@@ -198,7 +214,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (137 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (138 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -215,7 +231,7 @@ The offline self-test (137 checks) runs against simulated registry, NAV and comp
 - jobs: single ads only, with the hiring organisation checked (structured data or the ad's title); the careers landing page, FINN and NAV searches, a sister company's ad, the parent's posting, closed ads, postings without an employer or their own ad page, and expired postings left out
 - live openings only (Builderr's feedback on the latest run): a careers page saying "ingen ledige stillinger" with old job data, an ad page saying there is nothing open, an ad redirecting to the list; an open-application line next to real ads does not hide them
 - profiles for this exact company: a group's bare-brand account for a country arm, a national body's account for a local unit, brand accounts on a site that says it is part of a group, a link labelled as the group's
-- more news from the company's own site: a dated post on the homepage, an undeclared WordPress feed
+- more news from the company's own site: a dated post on the homepage, an undeclared WordPress feed; a shop's product feed and a card whose date disagrees with the date in its own address are not news
 - summary: the at-a-glance line, including the revenue trend, and the "What's new" line (order, evidence, the empty case, changes on a re-run)
 - run report: the quality section passes on every fixture and catches a claim with missing evidence or website facts without a verified website
 - input formats, unfamiliar column or key names, and malformed numbers
