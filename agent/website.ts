@@ -849,7 +849,7 @@ const NEWS_NAV_LABEL = new RegExp(
 // Listing, archive and shop paths: never a single post.
 const NOT_A_POST_PATH = /\/(kategori|kategorier|category|categories|tag|tags|tema|emne|topics?|arkiv|archive|page|side|author|forfatter|feed|rss|sok|search|produkt|produkter|product|products|shop|butikk|nettbutikk|vare|varer|collections?|catalog|katalog|sortiment|tilbud|kampanjer?)(\/|$)/i;
 // Shop prices ("1 299,-", "kr 1 299,00", "NOK 499,-") and buy buttons.
-const PRICE_TAG = /(\d[\d .\u00a0]*,-|\d[\d .\u00a0]*,\d\d\s*(kr|nok)\b|\b(kr|nok)\.?\s?\d[\d .\u00a0]*,(\d\d|-))/i;
+const PRICE_TAG = /(\d[\d .\u00a0]*,-|\d[\d .\u00a0]*,\d\d\s*(kr|nok)\b|\b(kr|nok)\.?\s?\d[\d .\u00a0]*,(\d\d|-)|\b\d{2,6}\s?(kr|nok)\b)/i;
 const SHOP_WORDS = /(legg i (handle)?kurv|handlekurv|add to (cart|basket)|kj[oø]p n[aå]|p[aå] lager|lagerstatus|in stock)/i;
 // A date right after one of these words is when a post was changed, not when it was published.
 const MODIFIED_LABEL = /(oppdatert|sist endret|endret|redigert|revidert|updated|last updated|modified|edited)\s*(den|on|at)?\s*:?\s*$/i;
@@ -933,8 +933,12 @@ const xmlText = (block: string, name: string): string | null => {
  */
 export function feedItems(xml: string): { title: string; url: string | null; date: string | null }[] {
   const out: { title: string; url: string | null; date: string | null }[] = [];
+  // A shop's product feed ("Produkter – Lappeliten.no") lists new products, not news.
+  const channel = xml.match(/<(channel|feed)\b[^>]*>[\s\S]*?<title[^>]*>([\s\S]*?)<\/title>/i)?.[2] || '';
+  if (/^\s*(<!\[CDATA\[)?\s*(produkter|products|produkt|product|nettbutikk|butikk|shop|varer)\b/i.test(channel)) return out;
   for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
     const b = m[1];
+    if (/post_type=product\b/i.test(b)) continue;
     const pub = xmlText(b, 'pubDate') ?? xmlText(b, 'dc:date');
     const guid = b.match(/<guid\b[^>]*isPermaLink\s*=\s*["']true["'][^>]*>([^<]+)<\/guid>/i)?.[1]?.trim() ?? null;
     out.push({ title: xmlText(b, 'title') || '', url: xmlText(b, 'link') || guid, date: pub ? parseDate(pub) : null });
@@ -1102,6 +1106,8 @@ function articleNodes(html: string): { date: string; title: string; url: string 
 /** A shop listing (the "Nyheter" of a web shop is new products), not a news page. */
 function isShopListing(html: string): boolean {
   if (jsonLdNodes(html).some((n) => ([] as unknown[]).concat(n['@type'] || []).some((t) => /^(Product|ProductGroup)$/.test(String(t))))) return true;
+  // A shop platform's product grid (WooCommerce and similar), with prices.
+  if (/(add_to_cart_button|woocommerce-loop-product|class=["'][^"']*\bproduct-grid\b|data-product[_-]id)/i.test(html) && [...stripTags(html).matchAll(new RegExp(PRICE_TAG.source, 'gi'))].length >= 3) return true;
   const text = stripTags(html);
   return SHOP_WORDS.test(text) && [...text.matchAll(new RegExp(PRICE_TAG.source, 'gi'))].length >= 3;
 }
