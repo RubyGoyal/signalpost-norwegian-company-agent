@@ -56,6 +56,8 @@ export interface PageAnalysis {
   /** News feeds the page declares (<link rel="alternate" type="application/rss+xml">), comment feeds left out. */
   feeds?: string[];
   parked: boolean;
+  /** The page's HTML (used to read dated posts shown on the homepage). */
+  html?: string;
 }
 
 export interface SiteVerdict {
@@ -106,6 +108,17 @@ const GROUP_TOKENS = ['gruppen', 'gruppa', 'group', 'konsern', 'konsernet', 'hol
 const groupWordIn = (s: string, tokens: string[]) => GROUP_TOKENS.some((g) => s.includes(g) && !tokens.some((t) => t.includes(g)));
 /** Country words a company may add to its own name ("Certego Norge"). */
 const NAME_AFFIXES = new Set(['norge', 'norway', 'no', 'nor']);
+/**
+ * Words that make a legal name one unit of something bigger: a country arm ("Certego Norge AS"),
+ * a region or a city ("Bondens Marked Vestfold SA", "Kiwi Oslo AS"). An account under the bare
+ * brand, without that word, is usually the parent's or the whole chain's.
+ */
+const SCOPE_TOKENS = new Set([
+  'norge', 'norway', 'norden', 'nordic', 'nordics', 'nordisk', 'scandinavia', 'skandinavia', 'sverige', 'sweden', 'danmark', 'denmark', 'finland', 'europe', 'europa', 'international',
+  'nord', 'sor', 'ost', 'vest', 'midt', 'nordvest', 'sorvest', 'nordost', 'sorost', 'indre', 'ytre',
+  'oslo', 'akershus', 'ostfold', 'buskerud', 'innlandet', 'hedmark', 'oppland', 'vestfold', 'telemark', 'agder', 'rogaland', 'vestland', 'hordaland', 'sogn', 'fjordane', 'more', 'romsdal', 'trondelag', 'nordland', 'troms', 'finnmark', 'viken', 'hadeland', 'romerike', 'follo', 'ringerike', 'sunnmore', 'nordmore', 'helgeland', 'lofoten', 'vesteralen', 'salten', 'jaeren', 'ryfylke', 'hallingdal', 'valdres', 'gudbrandsdalen', 'osterdalen', 'setesdal', 'lister',
+  'bergen', 'trondheim', 'stavanger', 'kristiansand', 'tromso', 'drammen', 'fredrikstad', 'sandnes', 'bodo', 'alesund', 'sarpsborg', 'skien', 'haugesund', 'tonsberg', 'moss', 'porsgrunn', 'arendal', 'hamar', 'larvik', 'halden', 'lillehammer', 'molde', 'harstad', 'gjovik', 'kongsberg', 'narvik', 'alta', 'steinkjer', 'kristiansund', 'asker', 'baerum', 'lillestrom', 'ski', 'jessheim', 'horten', 'sandefjord', 'grimstad', 'mandal', 'floro', 'forde', 'elverum', 'kongsvinger', 'mo', 'mosjoen', 'sandnessjoen', 'hammerfest', 'kirkenes', 'vadso', 'egersund', 'bryne', 'stord', 'voss', 'notodden', 'honefoss', 'raufoss', 'orkanger', 'stjordal', 'levanger', 'namsos', 'svolvaer', 'sortland', 'finnsnes',
+]);
 
 /** True when a name ("Brunvoll", "Testselskap Alpha AS") is this company's legal name, legal form aside. */
 export function sameCompanyName(name: string, legalName: string): boolean {
@@ -320,7 +333,9 @@ export function analyzePage(page: WebPage): PageAnalysis {
   for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const href = attr(`<a ${m[1]}>`, 'href');
     if (!href) continue;
-    const text = decodeEntities(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    let text = decodeEntities(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    // Icon links carry their name in a label ("Kappa Gruppen på Facebook").
+    if (!text) text = decodeEntities(attr(`<a ${m[1]}>`, 'aria-label') || attr(`<a ${m[1]}>`, 'title') || '').replace(/\s+/g, ' ').trim();
     if (/^mailto:/i.test(href)) mailto.push(decodeURIComponent(href.slice(7).split('?')[0]).trim().toLowerCase());
     else if (/^tel:/i.test(href)) tel.push(href.slice(4));
     else {
@@ -350,7 +365,7 @@ export function analyzePage(page: WebPage): PageAnalysis {
   const orgnrs = findOrgnrs(`${text}\n${ldText.join('\n')}`);
   const lower = `${title} ${text.slice(0, 3000)}`.toLowerCase();
   const parked = PARKED_MARKERS.some((p) => lower.includes(p)) && text.length < 4000;
-  return { url: page.url, snapshot: page.snapshot, title, siteNames, text, orgnrs, links, mailto, tel, sameAs, feeds: feedLinks(html, base), parked };
+  return { url: page.url, snapshot: page.snapshot, title, siteNames, text, orgnrs, links, mailto, tel, sameAs, feeds: feedLinks(html, base), parked, html };
 }
 
 // ---------------------------------------------------------------------------
@@ -682,7 +697,11 @@ export function handleMatchesName(handleRaw: string, legalName: string): boolean
   const tokens = nameTokens(legalName);
   if (!tokens.length || tokens.join('').length < 4) return false;
   const nameWords = translit(legalName).match(/[a-z0-9]+/g) || [];
-  return handleRest(handleRaw, tokens, tokens.length >= 4 ? tokens.length - 1 : tokens.length, nameWords) === '';
+  if (handleRest(handleRaw, tokens, tokens.length >= 4 ? tokens.length - 1 : tokens.length, nameWords) !== '') return false;
+  // A long name may drop one word in its handle, but not the word that makes it this unit
+  // ("Røde Kors Hjelpekorps Oslo" is not "rodekorshjelpekorps").
+  const h = translit(handleRaw).replace(/[^a-z0-9]/g, '');
+  return !tokens.some((t) => SCOPE_TOKENS.has(t) && !h.includes(t));
 }
 
 /**
@@ -699,10 +718,27 @@ export function handleIsSiteBrand(handleRaw: string, verdict: SiteVerdict, legal
   if (!(label.includes(tokens.join('')) || tokens.some((t) => t.length >= 4 && label.includes(t)))) return false;
   if (handleRest(handleRaw, [label], 1) !== '') return false;
   const core = translit(handleRaw).replace(/[^a-z0-9]/g, '');
+  // A country arm, region or city unit ("Certego Norge AS" on certego.no): the bare brand's
+  // account is the parent's or the chain's, not this company's.
+  if (tokens.some((t) => SCOPE_TOKENS.has(t) && !core.includes(t))) return false;
+  // The site says it is part of a group, or names a company that carries the brand ("Treteam AS",
+  // "Treteam Holding AS"): the brand's account may well be that company's.
+  if (verdict.pages.some((p) => GROUP_PHRASES.test(p.text))) return false;
   return !otherEntities(verdict.pages, legalName).some((n) => {
     const c = n.replace(/\s+(as|asa|sa|ans|da|nuf|ks)$/, '').replace(/\s+/g, '');
-    return c === label || c === core;
+    return c === label || c === core || c.startsWith(label) || c.startsWith(core);
   });
+}
+
+/**
+ * The link to the account names someone else: its text or label names a group ("Følg Kappa
+ * Gruppen på Facebook") or another company named on the site.
+ */
+function linkNamesSomeoneElse(text: string, legalName: string, others: string[]): boolean {
+  const t = ` ${translit(text).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  if (t.trim().length < 3) return false;
+  if (groupWordIn(t, nameTokens(legalName))) return true;
+  return others.some((n) => t.includes(` ${n.replace(/\s+(as|asa|sa|ans|da|nuf|ks)$/, '')} `));
 }
 
 export function socialMatchesIdentity(p: SocialProfile, legalName: string, verdict?: SiteVerdict): boolean {
@@ -712,11 +748,20 @@ export function socialMatchesIdentity(p: SocialProfile, legalName: string, verdi
 
 export function profilesFrom(verdict: SiteVerdict, legalName: string): { profile: SocialProfile; page: PageAnalysis; via: string }[] {
   const out = new Map<string, { profile: SocialProfile; page: PageAnalysis; via: string }>();
+  const refused = new Set<string>();
+  const others = otherEntities(verdict.pages, legalName);
   for (const page of verdict.pages) {
-    const raw = [...page.links.map((l) => ({ u: l.url, via: 'link' })), ...page.sameAs.map((u) => ({ u, via: 'structured data sameAs' }))];
-    for (const { u, via } of raw) {
+    const raw = [...page.links.map((l) => ({ u: l.url, text: l.text, via: 'link' })), ...page.sameAs.map((u) => ({ u, text: '', via: 'structured data sameAs' }))];
+    for (const { u, text, via } of raw) {
       const p = normalizeSocial(u);
-      if (!p || out.has(p.url) || !socialMatchesIdentity(p, legalName, verdict)) continue;
+      if (!p || refused.has(p.url)) continue;
+      // An account the site itself introduces as someone else's is never this company's.
+      if (linkNamesSomeoneElse(text, legalName, others)) {
+        refused.add(p.url);
+        out.delete(p.url);
+        continue;
+      }
+      if (out.has(p.url) || !socialMatchesIdentity(p, legalName, verdict)) continue;
       out.set(p.url, { profile: p, page, via });
     }
   }
@@ -818,8 +863,23 @@ const ATS_HOSTS = /(^|\.)(teamtailor\.com|webcruiter\.(com|no)|jobbnorge\.no|rec
 // One ad, not a list or a search: a numeric id or a UUID in the address.
 const SINGLE_AD = /(\/jobs?\/\d{3,}|\/jobs?\/[0-9a-f]{8}-[0-9a-f]{4}-|[?&](advertid|projectid|jobid|job_id|vacancyid|adid|id)=\d{3,}|\/(stilling|stillinger|vacancy|vacancies|annonse|position|positions|ad|job-ad)\/\d{3,}|jobid:\d+|\/j\/[0-9a-f]{6,}|\/\d{6,}-[\w-]+|\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 const SEARCH_LIKE = /((^|\/)(search|sok|s%c3%b8k|browse|results?|resultat|filter|liste?)(\/|$|\.|\?)|[?&](q|query|s|search|orgid|employer|page|side|category|kategori)=)/i;
+// A careers or ad page saying there is nothing open ("No Open Positions", "Vi har ingen ledige stillinger").
+const NO_OPENINGS = /(\bno (open|current|available|vacant|active) (positions|jobs|roles|vacancies|openings)\b|\b(there are|we have) (currently )?no (open |current |available )?(positions|jobs|roles|vacancies|openings)\b|\b(don'?t|do not) have any (open |current |available )?(positions|jobs|roles|vacancies|openings)\b|\bingen (ledige|aktive|[aå]pne|utlyste|tilgjengelige) (stillinger|jobber)\b|\bingen stillinger (er )?(ledige|utlyst|tilgjengelige)\b|\bingen (aktive |[aå]pne )?utlysninger\b|\b0 (ledige stillinger|stillinger|open positions|openings|jobs)\b)/gi;
+/** The page says there is nothing open. "Finner du ingen ledige stillinger som passer?" (an
+ *  invitation to apply openly, shown next to real ads) does not count. */
+export function saysNoOpenings(text: string): boolean {
+  for (const m of text.matchAll(NO_OPENINGS)) {
+    const at = m.index ?? 0;
+    const before = text.slice(Math.max(0, at - 40), at).toLowerCase();
+    const after = text.slice(at + m[0].length, at + m[0].length + 30).toLowerCase();
+    if (/(finner du|fant du|ser du|hvis du|om du|dersom|if you|don'?t see|can'?t find|didn'?t find|do not see|cannot find)[^.!?\n]*$/.test(before)) continue;
+    if (/^\s*(som (passer|matcher|er aktuelle|du (s[oø]ker|ser etter))|for (deg|you)|that (fit|match|suit)|matching|\?)/.test(after)) continue;
+    return true;
+  }
+  return false;
+}
 const OPEN_APPLICATION = /([aå]pen s[oø]knad|apen-soknad|open application|generell s[oø]knad|spontaneous application|talent ?pool|talentbank)/i;
-const MAX_AD_PAGES = 6;
+const MAX_AD_PAGES = 10;
 // Recruiting platforms' own names in a page title ("Designer - Alpha | Teamtailor").
 const ATS_BRAND = /^(teamtailor|webcruiter|jobbnorge|recman|hr ?manager|jobylon|reachmee|easycruit|simplyrecruit|varbi|lever|greenhouse|smartrecruiters|workable|talentech|homerun|careers?|karriere|jobb|jobs|ledige stillinger|stillinger)$/i;
 // An ad page that says the position is filled or closed.
@@ -925,6 +985,8 @@ export interface SiteActivity {
   newsFeed?: string;
   /** The careers page that was read (a landing page, never published as an opening). */
   careersPage: string | null;
+  /** The careers page says there are no open positions: no openings are taken from the site. */
+  careersPageSaysNoOpenings?: boolean;
   careersChecked: boolean;
   jobs: SiteJob[];
   snapshots: SourceSnapshot[];
@@ -1072,6 +1134,34 @@ function jobNodes(html: string): JobNode[] {
 }
 
 /**
+ * The page behind an ad link shows a live opening: it was not redirected away (closed ads usually
+ * send the reader back to a list), it does not say the position is closed or that there are no
+ * openings, and it names the job.
+ */
+function liveAdPage(page: WebPage, requested: string, title: string | null): boolean {
+  const req = new URL(requested);
+  const fin = new URL(page.url);
+  const key = (u: URL) => `${u.hostname.replace(/^www\./i, '')}${u.pathname.replace(/\/$/, '')}`.toLowerCase();
+  if (key(fin) !== key(req)) {
+    // Recruiting platforms tidy their ad URLs (a new slug, a canonical path). A redirect is fine
+    // when it lands on a single ad there that carries the same ad number; anywhere else (back to
+    // the list, the platform's front page, another site) the ad is gone.
+    const finWhere = fin.pathname + fin.search;
+    const adId = (req.pathname + req.search).match(/\d{3,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
+    const sameAd = SINGLE_AD.test(finWhere) && (!adId || fin.href.toLowerCase().includes(adId.toLowerCase()));
+    if (!ATS_HOSTS.test(fin.hostname) || SEARCH_LIKE.test(finWhere) || !sameAd) return false;
+  }
+  const a = analyzePage(page);
+  const text = `${a.title}\n${a.text}`.slice(0, 40_000);
+  if (CLOSED_AD.test(text) || saysNoOpenings(text)) return false;
+  if (!title) return true;
+  const hay = translit(text).replace(/[^a-z0-9]+/g, ' ');
+  const words = (translit(title).match(/[a-z0-9]{4,}/g) || []).filter((w) => !['stilling', 'jobb', 'ledig'].includes(w));
+  if (!words.length) return hay.includes(translit(title).replace(/[^a-z0-9]+/g, ' ').trim());
+  return words.filter((w) => hay.includes(w)).length / words.length >= 0.6;
+}
+
+/**
  * A single, current ad whose hiring organisation is this company (by organisation number when the
  * ad gives one, otherwise by its legal name). Ads for the parent or a sister company, open
  * applications and expired or undated postings are not openings of this company.
@@ -1189,18 +1279,67 @@ export async function readSiteActivity(
       }
     }
   }
-  // The feed the news page or the homepage declares (a news category's own feed first). Only the
-  // publish date of each item is used.
-  const feedUrl = pickFeed([...newsPageFeeds, ...verdict.pages.flatMap((p) => p.feeds ?? [])], domain);
-  if (feedUrl && !signal?.aborted) {
-    const f = await web.getPage(feedUrl, `${snapPrefix}:feed`, signal, 'feed');
-    act.snapshots.push(f.outcome === 'ok' ? f.page.snapshot : f.snapshot);
-    if (f.outcome === 'ok') {
-      act.newsFeed = f.page.url;
-      for (const it of feedItems(f.page.html)) {
-        const url = it.url ? sitePostUrl(it.url, f.page.url, domain) : null;
-        if (url) add(it.date, it.title, url, 'news feed (publish date)', f.page.snapshot);
+  // Dated posts the homepage itself shows ("Siste nytt" cards), when no news page gave any: only
+  // links to post addresses on the site (/nyheter/..., /aktuelt/..., /2026/10/...) whose card
+  // carries a publish date.
+  const home = verdict.pages[0];
+  if (!act.news.length && home?.html && !act.newsPageSkipped && !isShopListing(home.html)) {
+    const postUrl = (raw: string): string | null => {
+      let u: URL;
+      try {
+        u = new URL(raw, home.url);
+      } catch {
+        return null;
       }
+      if (registrableDomain(u.hostname) !== domain) return null;
+      const path = u.pathname.replace(/\/$/, '');
+      if (path.split('/').filter(Boolean).length < 2 || !(NEWS_PATH.test(u.pathname) || /\/20\d\d\/[01]\d\//.test(u.pathname))) return null;
+      if (NOT_A_POST_PATH.test(path) || /\.(pdf|jpe?g|png|gif|svg|zip|docx?|xlsx?|mp4)$/i.test(path)) return null;
+      return `${u.origin}${u.pathname}`;
+    };
+    for (const a of articleNodes(home.html)) {
+      const url = a.url ? postUrl(a.url) : null;
+      if (url) add(a.date, a.title, url, 'structured data on the homepage', home.snapshot);
+    }
+    const items = anchorsWithPos(home.html, home.url).flatMap((a) => {
+      const url = postUrl(a.url);
+      return url ? [{ ...a, url }] : [];
+    });
+    for (const a of items) {
+      if (seen.has(a.url)) continue;
+      const block = itemBlock(home.html, a, items);
+      const blockText = stripTags(block);
+      if (PRICE_TAG.test(blockText) || SHOP_WORDS.test(blockText)) continue;
+      const own = a.inner.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+      let title = own ? stripTags(own) : a.text;
+      if (title.length < 8 || GENERIC_LINK.test(title) || NEWS_NAV_LABEL.test(title)) {
+        const h = block.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+        if (h) title = stripTags(h);
+      }
+      add(publishedDate(block), title, a.url, 'homepage news link', home.snapshot);
+    }
+  }
+  // The feed the news page or the homepage declares (a news category's own feed first). When none
+  // is declared, the standard feed address of the common site builders is tried once (WordPress
+  // "/feed/" under the news page or at the root, Wix "/blog-feed.xml"). Only the publish date of
+  // each item is used.
+  const declared = pickFeed([...newsPageFeeds, ...verdict.pages.flatMap((p) => p.feeds ?? [])], domain);
+  const origin = home ? new URL(home.url).origin : `https://${domain}`;
+  const probes = declared
+    ? [declared]
+    : [act.newsPage && new URL(act.newsPage).pathname.length > 1 ? `${act.newsPage.replace(/[?#].*$/, '').replace(/\/$/, '')}/feed/` : null, `${origin}/feed/`, `${origin}/blog-feed.xml`].filter((x): x is string => !!x).slice(0, 2);
+  for (const [i, feedUrl] of probes.entries()) {
+    if (signal?.aborted || act.newsFeed) break;
+    const f = await web.getPage(feedUrl, `${snapPrefix}:feed${i ? `:${i}` : ''}`, signal, 'feed');
+    // A probe that finds nothing is not a source; a declared feed is recorded either way.
+    if (declared || f.outcome === 'ok') act.snapshots.push(f.outcome === 'ok' ? f.page.snapshot : f.snapshot);
+    if (f.outcome !== 'ok') continue;
+    const its = feedItems(f.page.html);
+    if (!declared && !its.length) continue;
+    act.newsFeed = f.page.url;
+    for (const it of its) {
+      const url = it.url ? sitePostUrl(it.url, f.page.url, domain) : null;
+      if (url) add(it.date, it.title, url, declared ? 'news feed (publish date)' : 'news feed at the standard address (publish date)', f.page.snapshot);
     }
   }
   act.news.sort((x, y) => y.date.localeCompare(x.date) || x.url.localeCompare(y.url));
@@ -1220,11 +1359,18 @@ export async function readSiteActivity(
         seen.add(url);
         act.jobs.push({ title: j.title, url, posted: j.posted, expires: j.expires, listed_on: new URL(url).hostname, hiring_organisation: j.org, hiring_organisation_number: j.orgIds.includes(id.orgnr) ? id.orgnr : null, snapshot, via });
       };
-      // 1. Job postings described on the careers page itself, for this company only.
-      // Each must link to its own ad: the careers page itself is a landing page, not a job.
+      // A careers page that says there is nothing open has no openings, whatever data it carries.
+      if (saysNoOpenings(analyzePage(r.page).text.slice(0, 40_000))) {
+        act.careersPageSaysNoOpenings = true;
+        return act;
+      }
+      let adReads = 0;
+      // 1. Job postings described on the careers page itself, for this company only. Each must
+      //    link to its own ad, and that ad page is read: it must show a live opening for this job.
+      //    The careers page itself is a landing page, not a job.
       const landing = r.page.url.replace(/[?#].*$/, '').replace(/\/$/, '');
       for (const j of jobNodes(r.page.html)) {
-        if (!j.url || !openingFor(j, id)) continue;
+        if (!j.url || !openingFor(j, id) || adReads >= MAX_AD_PAGES || signal?.aborted) continue;
         let u: URL;
         try {
           u = new URL(j.url, r.page.url);
@@ -1234,8 +1380,13 @@ export async function readSiteActivity(
         const where = u.pathname + u.search;
         if (!/^https?:$/.test(u.protocol) || `${u.origin}${u.pathname}`.replace(/\/$/, '') === landing || SEARCH_LIKE.test(where)) continue;
         if (registrableDomain(u.hostname) !== domain && !SINGLE_AD.test(where)) continue;
+        if (/(^|\.)(finn\.no|nav\.no)$/i.test(u.hostname)) continue; // NAV ads come from the NAV feed; FINN pages are not read
         u.hash = '';
-        push(j, u.href, r.page.snapshot, 'structured data JobPosting on the careers page');
+        if (seen.has(u.href)) continue;
+        const ad = await web.getPage(u.href, `${snapPrefix}:job:${adReads++}`, signal);
+        act.snapshots.push(ad.outcome === 'ok' ? ad.page.snapshot : ad.snapshot);
+        if (ad.outcome !== 'ok' || !liveAdPage(ad.page, u.href, j.title)) continue;
+        push(j, ad.page.url, ad.page.snapshot, 'job ad on its own page, listed in the careers page data');
       }
       // 2. Single ads on the company's career site at a recruiting platform. Each ad is read and
       //    counted only when it names this company as the hiring organisation: group career
@@ -1249,23 +1400,23 @@ export async function readSiteActivity(
         const url = `${u.origin}${u.pathname}${u.search}`;
         if (!adLinks.includes(url) && !seen.has(url)) adLinks.push(url);
       }
-      for (const [i, url] of adLinks.slice(0, MAX_AD_PAGES).entries()) {
-        if (signal?.aborted) break;
-        const ad = await web.getPage(url, `${snapPrefix}:job:${i}`, signal);
+      for (const url of adLinks) {
+        if (signal?.aborted || adReads >= MAX_AD_PAGES) break;
+        const ad = await web.getPage(url, `${snapPrefix}:job:${adReads++}`, signal);
         const snap = ad.outcome === 'ok' ? ad.page.snapshot : ad.snapshot;
         snap.publisher = `The company (its job ad on ${new URL(url).hostname}, linked from its careers page)`;
         act.snapshots.push(snap);
         if (ad.outcome !== 'ok') continue;
         const nodes = jobNodes(ad.page.html);
         if (nodes.length === 1) {
-          if (openingFor(nodes[0], id)) push(nodes[0], ad.page.url, ad.page.snapshot, 'job ad linked from the careers page');
+          if (openingFor(nodes[0], id) && liveAdPage(ad.page, url, nodes[0].title)) push(nodes[0], ad.page.url, ad.page.snapshot, 'job ad linked from the careers page');
           continue;
         }
         if (nodes.length > 1) continue; // a list, not one ad
         // No structured data (Jobylon and others): the ad's own title must name this company as the
-        // employer ("Teamleder kundeservice | Homely"), and the ad must not say it is closed.
+        // employer ("Teamleder kundeservice | Homely"), and the ad must show a live opening.
         const a = analyzePage(ad.page);
-        if (CLOSED_AD.test(a.text.slice(0, 20_000))) continue;
+        if (!liveAdPage(ad.page, url, null)) continue;
         const titles = [a.title, ...a.siteNames].filter(Boolean);
         let employer: string | null = null;
         let jobTitle: string | null = null;

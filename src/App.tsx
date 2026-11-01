@@ -469,11 +469,17 @@ function CompanyView({ orgnr }: { orgnr: string }) {
       {/* Summary */}
       <Card title="Summary">
         <ul className="space-y-2.5">
-          {e.summary.statements.map((s, i) => (
-            <li key={i} className="text-sm leading-relaxed text-slate-800">
-              {s.text} <SourceLinks ids={s.evidence_ids.slice(0, 3)} evidence={evidence} snapshots={snapshots} />
-            </li>
-          ))}
+          {e.summary.statements.map((s, i) => {
+            const isNew = s.text.startsWith("What's new");
+            return (
+              <li
+                key={i}
+                className={`text-sm leading-relaxed text-slate-800 ${isNew ? 'px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg' : ''} ${s.text.startsWith('At a glance:') ? 'font-medium' : ''}`}
+              >
+                {s.text} <SourceLinks ids={s.evidence_ids.slice(0, isNew ? 6 : 3)} evidence={evidence} snapshots={snapshots} />
+              </li>
+            );
+          })}
         </ul>
       </Card>
 

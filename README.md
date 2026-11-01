@@ -4,6 +4,17 @@ Signalpost takes Norwegian organisation numbers and returns one result envelope 
 
 Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/signalpost).
 
+## What's new in version 5
+
+Builderr's feedback on the latest run named three fixes and one way to go further. Each is now a rule in the agent and an offline test.
+
+| Builderr's point | What the agent does now | Offline test |
+|---|---|---|
+| Jobs: only link a page that shows a live opening | Every job ad is opened before it is published, including ads listed in a careers page's structured data. The ad must name the job, must not say it is closed or that there are no openings, and must not send the reader back to a list. A careers page that says "No open positions" or "Ingen ledige stillinger" gives no openings at all, whatever old job data it carries, and the summary says so. "Finner du ingen ledige stillinger som passer?" next to real ads does not hide them. | A careers page saying "ingen ledige stillinger" with a stale posting; an ad page saying there is nothing open; an ad that redirects to the list; an open-application line next to real ads |
+| Social: check the page is for this exact company | An account named after the bare brand is not used for a country arm, region or city unit ("Certego Norge AS", "Bondens Marked Vestfold SA"), on a site that says it is part of a group, or when the site names a holding or parent company with the brand. A link the site itself introduces as a group's or another company's ("Følg Kappa Gruppen på Facebook", also in icon labels) is never used. | A group's account for a country arm; a national body's account for a local unit; a group phrase on the site; a link labelled as the group's |
+| News: only 1 item was found | More dated posts from the company's own verified site: posts shown on the homepage when there is no news page, and the site's feed at the standard address of the common site builders (WordPress `/feed/`, Wix `/blog-feed.xml`) when the site does not declare one. Every post still needs its publish date. | A dated "Siste nytt" card on the homepage (an undated card and a service page left out); an undeclared WordPress feed |
+| Flag what is new | Every summary now has a "What's new" line right after "At a glance": every dated fact from the past 12 months, newest first, each with its evidence (registry changes, annual accounts filed with the revenue change on the year before, board and CEO changes, new locations, name changes, status flags, job ads, website news). When nothing is dated it says so. On a re-run, it also counts the changes since the last check, which keep the previous value and evidence. The web app highlights this line. | Order, evidence and wording of the line; the empty case; the count of changes on a re-run |
+
 ## What's new in version 4
 
 Builderr's audit of version 3 asked for four fixes. Each one is now a rule in the agent, an offline test, and a result on real company websites.
@@ -62,7 +73,7 @@ Optional flags and environment variables:
 | `claims` | One per fact: `field`, `value`, `unit`, `reporting_period`, `source_date`, `retrieved_at`, `evidence_ids` |
 | `evidence` | Source URL, source class (`official_registry`, `official_job_board` or `company_owned`), `claim_span` (the JSON path in a register response, or the exact text or link on a company web page), retrieval time, SHA-256 of the source response, reporting period |
 | `source_snapshots` | Every request: URL, HTTP status, retrieval time, content hash, licence |
-| `summary` | Starts with an "at a glance" line: organisation form, place, industry, employees, latest revenue and its change on the previous year, hiring, website. Then what the company does, size, people, locations, status, website and profiles, hiring, registry activity, website news, what changed, and what is unknown. Each statement links to its evidence. |
+| `summary` | Starts with an "at a glance" line: organisation form, place, industry, employees, latest revenue and its change on the previous year, hiring, website. Next comes "What's new": every dated fact from the past 12 months, newest first. Then what the company does, size, people, locations, status, website and profiles, hiring, registry activity, website news, what changed, and what is unknown. Each statement links to its evidence. |
 | `changes` | Material changes since the previous run (`new_value`, `changed_value`, `removed_value`) with before and after values and the previous evidence |
 | `refresh` | `cold_start` or `previous_run`, the previous run ID and date, the same change list, and the number of unchanged claims |
 | `run`, `operations`, `errors` | Run ID and timing, requests used, third-party cost ($0), and any source errors |
@@ -81,7 +92,7 @@ Optional flags and environment variables:
 - Contact points: registered company email and phone, plus role email addresses (post@, salg@ ...) and the main phone number from the verified website's own domain (never staff members' own details, and nothing for sole proprietorships)
 - Group structure
 - **Hiring:** active job ads from NAV's job vacancy feed (arbeidsplassen.no), attached when the ad's employer organisation number is the company or one of its registered sub-units (including ads posted under a brand name). Also single job ads linked from the verified website's careers page, when the ad names this company as the hiring organisation.
-- **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated posts from the verified website's news page and its own news feed.
+- **Public activity:** the registry's dated change log since 2025, for example "annual accounts filed: 2025", "employee count updated", "business address changed". Also dated posts from the verified website: its news page, the posts its homepage shows, and its own news feed.
 
 ## Rules the agent follows
 
@@ -97,10 +108,10 @@ Optional flags and environment variables:
   - it shows neither this company's name nor its organisation number (a brand site);
   - it is parked, does not answer, or is a directory listing. A social page registered as the website is published as a profile instead.
   The reason is given in the availability and in the summary. A registered website that cannot be read this time (robots.txt, bot protection or an outage) is kept only when its domain carries the company's name. A registered address that is a page on a larger site (`group.no/companies/this-one`) is verified as that page, and nothing else on that domain (news, jobs, emails) is used.
-- **Profiles only when the handle is this company's name.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name (give or take the legal form, a country word such as "norge", or digits), or the name of the company's own verified domain (its brand, as "agropumper" on agropumper.no). The domain rule is not used on a page of someone else's site, for a domain with a group word, or when another company named on the site has that name. A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out. Share buttons and personal profiles are ignored.
+- **Profiles only for this exact company.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name (give or take the legal form, a country word such as "norge", or digits), or the name of the company's own verified domain (its brand, as "agropumper" on agropumper.no). A long name may drop one word in its handle, but never its place or country word, so a national body's account is not a local unit's. The domain rule is not used on a page of someone else's site, for a domain with a group word, for a country arm, region or city unit ("Certego Norge AS" on certego.no), on a site that says it is part of a group, or when another company named on the site carries the brand ("Treteam AS", "Treteam Holding AS"). A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out, and so is any link whose text or icon label names a group or another company. Share buttons and personal profiles are ignored.
 - **Contacts without personal data.** Email links are taken only on the site's own domain and only for role addresses (post@, salg@, kundeservice@ and similar), never a staff member's own address. Only the site's main phone number is taken.
-- **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page (never a neighbour's), its structured data (`datePublished`), or the site's own declared feed (RSS `pubDate`, Atom `published`). Feed `lastBuildDate` and `<updated>` are never used, and comment feeds, product feeds and posts on other sites are left out. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
-- **Jobs are single ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title; closed ads are left out), and structured `JobPosting` data that links to its own ad and names this company. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications and expired or undated postings are left out.
+- **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page or the homepage (never a neighbour's), its structured data (`datePublished`), or the site's own feed (RSS `pubDate`, Atom `published`): the one it declares or, when it declares none, the standard address of the common site builders (WordPress `/feed/`, Wix `/blog-feed.xml`). Feed `lastBuildDate` and `<updated>` are never used, and comment feeds, product feeds and posts on other sites are left out. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
+- **Jobs are single, live ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title), and structured `JobPosting` data that links to its own ad and names this company. Every ad page is opened and must show a live opening: it names the job, does not say the position is closed or that there are no openings, and does not redirect back to a list. A careers page that says there are no open positions gives no openings at all. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications and expired or undated postings are left out.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
 ## Sources, rights and outbound policy
@@ -113,7 +124,7 @@ Optional flags and environment variables:
 | Regnskapsregisteret (accounts) | `https://data.brreg.no/regnskapsregisteret/regnskap/{orgnr}` | NLOD 2.0 |
 | Enhetsregisteret (change log) | `https://data.brreg.no/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer={orgnr}` | NLOD 2.0 |
 | NAV job vacancy feed | `https://pam-stilling-feed.nav.no/api/v1/feed` and `/api/v1/feedentry/{uuid}` | [NAV API terms](https://arbeidsplassen.nav.no/vilkar-api): ads may be republished; inactive ads must be removed |
-| Company-owned websites | The company's own homepage, up to three contact, about or terms pages, its news and careers pages, the news feed it declares, and up to six single job ads its careers page links to on a recruiting platform (Teamtailor, Jobylon, Webcruiter, Jobbnorge and similar) | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
+| Company-owned websites | The company's own homepage, up to three contact, about or terms pages, its news and careers pages, its news feed (declared, or at the standard address), and up to ten single job ads its careers page links to (on its own site or a recruiting platform such as Teamtailor, Jobylon, Webcruiter or Jobbnorge) | Public pages read once per run; [robots.txt](https://www.rfc-editor.org/rfc/rfc9309) honoured; only facts about the company itself are published |
 
 **Registers and NAV.** Requests to these APIs go only to `data.brreg.no` and `pam-stilling-feed.nav.no`, over HTTPS. Any other host or a redirect off those hosts is refused in code (`ALLOWED_HOSTS` in `agent/brreg.ts`). Registry requests are rate-limited (default 8 concurrent) with retries and backoff on 429 and 5xx responses. Each company needs 5 or 6 registry requests: entity, roles, accounts, sub-units and change log.
 
@@ -123,7 +134,7 @@ Optional flags and environment variables:
 - Only `http` and `https`, default ports, and no credentials in the URL.
 - The host must resolve, and every address must be public. Loopback, private, link-local (including cloud metadata addresses), carrier-grade NAT, multicast and reserved ranges are refused. This is checked again on every redirect hop (at most 4).
 - `robots.txt` is honoured. A missing file allows access; one that cannot be fetched counts as a full disallow.
-- Only HTML pages and the site's own declared news feed are read, at most 1.5 MB per page and 8 seconds per request. A company gets at most a few pages and 20 seconds in total.
+- Only HTML pages and the site's own news feed are read, at most 1.5 MB per page and 8 seconds per request. A company gets at most a few pages and 20 seconds in total.
 - Social platforms, directory sites and FINN are never crawled.
 - A start-of-run probe and a circuit breaker turn the step off if the public web is unreachable. It is then reported as not checked, never as "no website".
 - Requests identify the agent with a `User-Agent` that links to this repository.
@@ -186,7 +197,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (125 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (137 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -201,7 +212,10 @@ The offline self-test (125 checks) runs against simulated registry, NAV and comp
 - the live check's cases: a title naming the company only as a whole, a thin homepage on the company's name domain, a front page redirecting deeper on the same site
 - news: dated posts only, with the publish date from the post's own block or the site's feed (`pubDate`, Atom `published`, never `<updated>`); "Se flere nyheter", archive, product cards, a shop's new-products page, modified-only dates and a neighbour's date left out
 - jobs: single ads only, with the hiring organisation checked (structured data or the ad's title); the careers landing page, FINN and NAV searches, a sister company's ad, the parent's posting, closed ads, postings without an employer or their own ad page, and expired postings left out
-- summary: the at-a-glance line, including the revenue trend
+- live openings only (Builderr's feedback on the latest run): a careers page saying "ingen ledige stillinger" with old job data, an ad page saying there is nothing open, an ad redirecting to the list; an open-application line next to real ads does not hide them
+- profiles for this exact company: a group's bare-brand account for a country arm, a national body's account for a local unit, brand accounts on a site that says it is part of a group, a link labelled as the group's
+- more news from the company's own site: a dated post on the homepage, an undeclared WordPress feed
+- summary: the at-a-glance line, including the revenue trend, and the "What's new" line (order, evidence, the empty case, changes on a re-run)
 - run report: the quality section passes on every fixture and catches a claim with missing evidence or website facts without a verified website
 - input formats, unfamiliar column or key names, and malformed numbers
 

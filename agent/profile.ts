@@ -237,6 +237,74 @@ function buildSummary(
       evidence_ids: ev(name, form, one('business_address'), nace, empC, rev[0], prevRev, site, ...all('job_ad').slice(0, 2), ...all('site_job').slice(0, 2)),
     });
   }
+  // What's new: every dated fact from the past 12 months, newest first, each with its evidence.
+  if (name && availability.legal_identity.state !== 'failed') {
+    const today = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+    type Item = { date: string; text: string; claims: Claim[]; rank: number; kind?: 'job' | 'news' };
+    let items: Item[] = [];
+    const put = (date: unknown, text: string, claim: Claim, rank = 5, kind?: Item['kind']) => {
+      const d = typeof date === 'string' ? date.slice(0, 10) : '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && d >= from && d <= today) items.push({ date: d, text, claims: [claim], rank, kind });
+    };
+    const revenue = claims.filter((c) => c.field === 'operating_revenue' && /#(SELSKAP|UNSPECIFIED)#/.test(c.key) && typeof c.value === 'number');
+    const revTrend = (year: string): string => {
+      const cur = revenue.find((c) => String(c.reporting_period?.to).slice(0, 4) === year);
+      const prev = revenue.find((c) => String(c.reporting_period?.to).slice(0, 4) === String(Number(year) - 1));
+      if (!cur || !prev || (prev.value as number) === 0) return '';
+      const pct = Math.round((((cur.value as number) - (prev.value as number)) / Math.abs(prev.value as number)) * 100);
+      return ` (operating revenue ${pct >= 0 ? 'up' : 'down'} ${Math.abs(pct)}% on ${Number(year) - 1})`;
+    };
+    for (const c of claims) {
+      const v = c.value as any;
+      if (c.field === 'registry_event') {
+        const yr = String(v.event).match(/annual accounts filed: (\d{4})/)?.[1];
+        put(v.date, `${v.event}${yr ? revTrend(yr) : ''}`, c, 2);
+      } else if (c.family === 'status_flags' && c.value === true && c.field !== 'registered_for_vat') put(c.source_date, `${c.field.replace(/_/g, ' ')} registered`, c, 0);
+      else if (c.field === 'registry_notice') put(v.date, `registry notice: ${v.text}`, c, 1);
+      else if (c.field === 'founded_date') put(c.value, 'founded', c, 1);
+      else if (c.field === 'former_name') put(v.to, `changed its name from ${v.name}`, c, 1);
+      else if (c.field === 'sub_unit') put(c.source_date, `new location registered${v.address?.city ? ` in ${titleCase(String(v.address.city))}` : ''}${v.name ? ` (${v.name})` : ''}`, c, 3);
+      else if (c.field === 'job_ad') put(v.published, `"${v.title}" on arbeidsplassen.no (NAV)`, c, 4, 'job');
+      else if (c.field === 'site_job') put(v.posted, `"${v.title}" linked from its website`, c, 4, 'job');
+      else if (c.field === 'site_news') put(v.date, `"${v.title}"`, c, 6, 'news');
+    }
+    // Role groups the registry marks as changed (one line per group: the board, the CEO, the auditor).
+    const GROUP_EN: Record<string, string> = { STYR: 'board registration changed', DAGL: 'CEO (daglig leder) registration changed', REVI: 'auditor registration changed', REGN: 'accountant registration changed' };
+    const groupsSeen = new Set<string>();
+    for (const c of claims.filter((x) => x.field === 'role')) {
+      const g = (c.value as any).group_code as string | undefined;
+      if (!g || !GROUP_EN[g] || groupsSeen.has(g)) continue;
+      groupsSeen.add(g);
+      const chair = g === 'STYR' ? claims.find((x) => x.field === 'role' && (x.value as any).role_code === 'LEDE') : g === 'DAGL' ? c : undefined;
+      put(c.source_date, `${GROUP_EN[g]}${chair ? ` (${g === 'STYR' ? 'chair' : 'now'}: ${(chair.value as any).name})` : ''}`, chair || c, 2);
+    }
+    items.sort((a, b) => b.date.localeCompare(a.date) || a.rank - b.rank || a.text.localeCompare(b.text));
+    // Job ads and news posts each become one line, dated by the newest, so registry changes stay in view.
+    for (const kind of ['job', 'news'] as const) {
+      const group = items.filter((x) => x.kind === kind);
+      if (!group.length) continue;
+      const n = group.length;
+      const text =
+        kind === 'job'
+          ? n === 1 ? `job ad posted: ${group[0].text}` : `latest of ${n} job ads posted: ${group[0].text}`
+          : n === 1 ? `news on its website: ${group[0].text}` : `latest of ${n} news posts on its website: ${group[0].text}`;
+      items = items.filter((x) => x.kind !== kind);
+      items.push({ date: group[0].date, text, claims: group.slice(0, 3).flatMap((x) => x.claims), rank: group[0].rank });
+    }
+    items.sort((a, b) => b.date.localeCompare(a.date) || a.rank - b.rank || a.text.localeCompare(b.text));
+    const shown = items.slice(0, 6);
+    const since = baseline === 'previous_run' && changes.length ? ` Since the last check on ${prevRetrieved?.slice(0, 10)}: ${changes.length} change${changes.length === 1 ? '' : 's'} (listed under Changes).` : '';
+    st.push(
+      items.length
+        ? {
+            text: `What's new (past 12 months, newest first): ${shown.map((x) => `${x.date} ${x.text}`).join('; ')}${items.length > shown.length ? `; +${items.length - shown.length} more` : ''}.${since}`,
+            evidence_ids: [...new Set(shown.flatMap((x) => x.claims.flatMap((c) => c.evidence_ids)))],
+          }
+        : { text: `What's new: nothing dated in the past 12 months in the sources checked.${since}`, evidence_ids: [] }
+    );
+  }
+
   const purpose = one('statutory_purpose') || one('registered_activity');
   if (nace || purpose) {
     const n = nace?.value as any;
@@ -452,6 +520,7 @@ function buildSummary(
     if (r === 'not_found_in_enhetsregisteret') return `${f.replace(/_/g, ' ')} (organisation number not found in the registry)`;
     if (r === 'deleted_from_enhetsregisteret') return `${f.replace(/_/g, ' ')} (entity deleted from the registry)`;
     if (r === 'jobs_source_disabled') return `${f.replace(/_/g, ' ')} (not checked in this run)`;
+    if (r.startsWith('checked_nav_no_active_ads') && r.endsWith('_and_careers_page_says_no_open_positions')) return `${f.replace(/_/g, ' ')} (none active on NAV; its careers page says there are no open positions)`;
     if (r.startsWith('checked_nav_no_active_ads')) return `${f.replace(/_/g, ' ')} (none active on NAV)`;
     if (r === 'no_registry_events_since_2025') return `${f.replace(/_/g, ' ')} (no registry events since 2025)`;
     if (r === 'no_verified_website_found') return `${f.replace(/_/g, ' ')} (none registered, none verified)`;
@@ -473,7 +542,9 @@ function buildSummary(
   if (unknowns.length)
     st.push({ text: `Unknown or not published: ${unknowns.map(reasonText).join(', ')}.`, evidence_ids: [] });
 
-  // The at-a-glance line leads the summary.
+  // The at-a-glance line leads the summary, with what is new right after it.
+  const whatsNew = st.findIndex((x) => x.text.startsWith("What's new"));
+  if (whatsNew > 0) st.unshift(...st.splice(whatsNew, 1));
   const glance = st.findIndex((x) => x.text.startsWith('At a glance:'));
   if (glance > 0) st.unshift(...st.splice(glance, 1));
   return { generator: 'deterministic_v1', text: st.map((s) => s.text).join(' '), statements: st, unknowns };
@@ -882,7 +953,14 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
     const jp = availability.job_postings;
     if (siteJobs && jp.state !== 'available')
       availability.job_postings = { state: 'available', reason: jp.state === 'failed' ? 'found_on_company_website_nav_unavailable' : 'found_on_company_website', checked_sources: [...jp.checked_sources, 'company_website'] };
-    else if (act.careersChecked) availability.job_postings = { ...availability.job_postings, checked_sources: [...availability.job_postings.checked_sources, 'company_website'] };
+    else if (act.careersChecked) {
+      const jp = availability.job_postings;
+      availability.job_postings = {
+        ...jp,
+        ...(act.careersPageSaysNoOpenings && !siteJobs && jp.state === 'not_available' && jp.reason.startsWith('checked_nav_no_active_ads') ? { reason: `${jp.reason}_and_careers_page_says_no_open_positions` } : {}),
+        checked_sources: [...jp.checked_sources, 'company_website'],
+      };
+    }
     if (act.newsChecked) {
       const pa = availability.public_activity;
       availability.public_activity = {

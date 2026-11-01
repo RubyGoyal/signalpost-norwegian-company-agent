@@ -343,6 +343,7 @@ const WEB: Record<string, Site> = {
         'Testselskap Alpha &ndash; programvare',
         `<a href="/nyheter/vi-flytter">Vi flytter til nye lokaler</a>
          <nav><a href="/kontakt">Kontakt oss</a> <a href="/nyheter">Nyheter</a> <a href="/karriere">Karriere</a> <a href="https://www.facebook.com/sharer/sharer.php?u=x">Del</a></nav>
+         <a href="https://www.facebook.com/alphatest">Følg Alpha Gruppen på Facebook</a>
          <p>Vi lager programvare for norske bedrifter.</p>
          <footer>Testselskap Alpha AS &middot; Org.nr 910&nbsp;000&nbsp;063 MVA &middot;
          <a href="mailto:salg@alpha-test.no">salg@alpha-test.no</a> <a href="mailto:post@alpha-test.no">post</a>
@@ -386,6 +387,11 @@ const WEB: Record<string, Site> = {
           <item><title>Julebord for alle ansatte i 2024</title><link>https://www.alpha-test.no/2024/12/julebord/</link><pubDate>Fri, 13 Dec 2024 08:00:00 +0000</pubDate></item>
         </channel></rss>`,
       },
+      '/karriere/driftstekniker-2026': page('Driftstekniker – Testselskap Alpha', '<h1>Driftstekniker</h1><p>Vi søker en driftstekniker til vårt kontor i Oslo. Søknadsfrist 1. desember.</p>'),
+      // A stale posting: the ad page now says there is nothing open.
+      '/karriere/servicetekniker-2026': page('Servicetekniker – Testselskap Alpha', '<h1>Servicetekniker</h1><p>Vi har ingen ledige stillinger for øyeblikket.</p>'),
+      // A stale posting whose ad now sends the reader back to the careers page.
+      '/karriere/elektriker-2026': { redirect: 'https://www.alpha-test.no/karriere' },
       '/comments/feed/': { type: 'application/rss+xml', feed: '<rss><channel><item><title>Kommentar til: Ny avtale med Bergen kommune</title><link>https://www.alpha-test.no/nyheter/ny-avtale-med-kommunen#comment-1</link><pubDate>Wed, 21 Oct 2026 08:00:00 +0000</pubDate></item></channel></rss>' },
       '/karriere': page(
         'Karriere – Testselskap Alpha',
@@ -401,13 +407,16 @@ const WEB: Record<string, Site> = {
          <li><a href="/karriere/sommerjobb-2027">Sommerjobb 2027</a></li>
          <li><a href="/karriere/vare-verdier">Våre verdier og kultur</a></li>
          <li><a href="/karriere/we-are-alpha">We are Alpha</a></li>
-         <li><a href="/karriere/apen-soknad">Send en åpen søknad</a></li></ul>
+         <li><a href="/karriere/apen-soknad">Send en åpen søknad</a></li>
+         <li><a href="https://alphatest.teamtailor.com/jobs/678901-kokk">Kokk</a></li></ul>
+         <p>Finner du ingen ledige stillinger som passer deg? Send oss en åpen søknad.</p>
          <a href="/karriere">Karriere</a> <a href="https://alphatest.teamtailor.com/jobs">Se alle</a>`,
-        '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","url":"https://alphatest.teamtailor.com/jobs/654321-prosjektleder","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Driftstekniker","datePosted":"2026-10-05","validThrough":"2099-01-01","url":"/karriere/driftstekniker-2026","hiringOrganization":{"@type":"Organization","name":"Alpha Test","identifier":"910 000 063"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Konsernsjef","datePosted":"2026-10-02","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Alpha Gruppen AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Uten arbeidsgiver","datePosted":"2026-10-02","validThrough":"2099-01-01"},{"@context":"https://schema.org","@type":"JobPosting","title":"Lagermedarbeider","datePosted":"2026-10-02","validThrough":"2099-01-01","hiringOrganization":{"name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Utgått stilling","datePosted":"2019-01-01","validThrough":"2020-01-01"}]</script>'
+        '<script type="application/ld+json">[{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","url":"https://alphatest.teamtailor.com/jobs/654321-prosjektleder","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Driftstekniker","datePosted":"2026-10-05","validThrough":"2099-01-01","url":"/karriere/driftstekniker-2026","hiringOrganization":{"@type":"Organization","name":"Alpha Test","identifier":"910 000 063"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Konsernsjef","datePosted":"2026-10-02","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Alpha Gruppen AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Uten arbeidsgiver","datePosted":"2026-10-02","validThrough":"2099-01-01"},{"@context":"https://schema.org","@type":"JobPosting","title":"Lagermedarbeider","datePosted":"2026-10-02","validThrough":"2099-01-01","hiringOrganization":{"name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Utgått stilling","datePosted":"2019-01-01","validThrough":"2020-01-01"},{"@context":"https://schema.org","@type":"JobPosting","title":"Servicetekniker","datePosted":"2026-09-01","validThrough":"2099-01-01","url":"/karriere/servicetekniker-2026","hiringOrganization":{"name":"Testselskap Alpha AS"}},{"@context":"https://schema.org","@type":"JobPosting","title":"Elektriker","datePosted":"2026-09-01","validThrough":"2099-01-01","url":"/karriere/elektriker-2026","hiringOrganization":{"name":"Testselskap Alpha AS"}}]</script>'
       ),
     },
   },
   'alpha-test.no': { pages: { '/': { redirect: 'https://www.alpha-test.no/' } } },
+  // (Alpha's single ad pages on its own site are added below.)
   'testselskapbeta.no': {
     pages: { '/': page('Testselskap Beta Utleie', '<p>Utleie av lokaler.</p><footer>Org.nr: 910 000 756</footer>') },
   },
@@ -494,15 +503,36 @@ Object.assign(WEB, {
     pages: {
       '/': page(
         'Bemanning & Rekruttering | Sigma Personal | Telemark & Agder',
-        '<p>Vi leverer bemanning og rekruttering til bedrifter i Telemark og Agder. Ta kontakt med oss for en uforpliktende prat om hvordan vi kan hjelpe din bedrift med riktig kompetanse, raskt og trygt.</p>'
+        `<p>Vi leverer bemanning og rekruttering til bedrifter i Telemark og Agder. Ta kontakt med oss for en uforpliktende prat om hvordan vi kan hjelpe din bedrift med riktig kompetanse, raskt og trygt.</p>
+         <section><h2>Siste nytt</h2>
+           <article><a href="/aktuelt/nytt-kontor-i-arendal"><h3>Nytt kontor i Arendal</h3></a><p>Publisert 12.09.2026</p></article>
+           <article><a href="/aktuelt/sommerjobber-2026"><h3>Sommerjobber for studenter</h3></a></article>
+           <article><a href="/tjenester/bemanning"><h3>Bemanning for industrien</h3></a><p>12.09.2026</p></article>
+         </section>`
       ),
     },
   },
-  'www.idehuset.no': { pages: { '/': page('Idehuset - Home', '<p>Velkommen.</p>') } },
+  // A WordPress site that does not declare its feed: read at the standard address.
+  'www.idehuset.no': {
+    pages: {
+      '/': page('Idehuset - Home', '<p>Velkommen.</p>'),
+      '/feed/': {
+        type: 'application/rss+xml; charset=UTF-8',
+        feed: '<rss><channel><title>Idehuset</title><item><title>Ny utstilling i Skien</title><link>https://www.idehuset.no/2026/09/ny-utstilling/</link><pubDate>Thu, 03 Sep 2026 08:00:00 +0000</pubDate></item></channel></rss>',
+      },
+    },
+  },
   'www.xi-test.no': {
     pages: {
       '/': { redirect: 'https://www.xi-test.no/no/forside/velkommen' },
-      '/no/forside/velkommen': page('Velkommen', '<footer>Testselskap Xi AS &middot; Org.nr 910 001 019 <a href="mailto:post@xi-test.no">post@xi-test.no</a></footer>'),
+      '/no/forside/velkommen': page('Velkommen', '<nav><a href="/no/ledige-stillinger">Ledige stillinger</a></nav><footer>Testselskap Xi AS &middot; Org.nr 910 001 019 <a href="mailto:post@xi-test.no">post@xi-test.no</a></footer>'),
+      // "No open positions", while the page data still describes an old posting (and its page still answers).
+      '/no/ledige-stillinger': page(
+        'Ledige stillinger – Testselskap Xi',
+        '<h1>Ledige stillinger</h1><p>Vi har dessverre ingen ledige stillinger akkurat nå. Følg oss gjerne for nye muligheter.</p>',
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Kokk","datePosted":"2026-09-01","validThrough":"2099-01-01","url":"/no/ledige-stillinger/kokk","hiringOrganization":{"name":"Testselskap Xi AS"}}</script>'
+      ),
+      '/no/ledige-stillinger/kokk': page('Kokk – Testselskap Xi', '<h1>Kokk</h1><p>Vi søker kokk.</p>'),
     },
   },
   'alphatest.teamtailor.com': {
@@ -513,6 +543,13 @@ Object.assign(WEB, {
         '<h1>Backend-utvikler</h1>',
         '<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Backend-utvikler","datePosted":"2026-10-03","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}}</script>'
       ),
+      '/jobs/654321-prosjektleder': page(
+        'Prosjektleder – Testselskap Alpha',
+        '<h1>Prosjektleder</h1><p>Bli med på laget.</p>',
+        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Prosjektleder","datePosted":"2026-10-01","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Testselskap Alpha AS"}}</script>'
+      ),
+      '/jobs/678901-kokk': { redirect: 'https://alphatest.teamtailor.com/jobs' },
+      '/jobs': page('Ledige stillinger – Testselskap Alpha | Teamtailor', '<h1>Ledige stillinger</h1><a href="/jobs/123456-backend-utvikler">Backend-utvikler</a>'),
       '/jobs/345678-designer': page('Designer - Testselskap Alpha | Teamtailor', '<h1>Designer</h1><p>Vi søker en designer.</p>'),
       '/jobs/456789-selger': page('Selger - Alpha Eiendom | Teamtailor', '<h1>Selger</h1>'),
       '/jobs/567890-lagerarbeider': page('Lagerarbeider - Testselskap Alpha | Teamtailor', '<h1>Lagerarbeider</h1><p>Stillingen er ikke lenger aktiv.</p>'),
