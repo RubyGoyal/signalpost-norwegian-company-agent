@@ -1,0 +1,557 @@
+{
+  "description": "Claude's own check of the 52 items on the hand-check page (the version 5 output for 16 companies). Each link was opened and read as a person would read it, without the agent's code. This is a model's check; the hand check by a person is reported separately in the README.",
+  "run_date": "2026-11-02",
+  "version_checked": "4c1f2c111c1d7d8b1e20fab2836626287a7d83ea, with the two news fixes of 0d7090f and cc064a8",
+  "results_by_source_type": {
+    "site": {
+      "items": 16,
+      "right": 16,
+      "wrong": 0,
+      "cant_tell": 0
+    },
+    "social": {
+      "items": 11,
+      "right": 10,
+      "wrong": 1,
+      "cant_tell": 0
+    },
+    "news": {
+      "items": 18,
+      "right": 18,
+      "wrong": 0,
+      "cant_tell": 0
+    },
+    "jobs": {
+      "items": 7,
+      "right": 5,
+      "wrong": 1,
+      "cant_tell": 1
+    }
+  },
+  "found_and_fixed": [
+    "Social: 912811042 ADVOKAT HELLELAND (a sole proprietorship): instagram.com/helleland is the owner's private personal account; it came in because the handle equals the domain helleland.one. For a sole proprietorship only a handle with the whole business name now counts (commit 00884d2).",
+    "Jobs: 820227492 HOMELY AS: the careers page links to Homely's Jobylon list, filled in by a script, so the agent saw no ads although six were live. The agent now reads the list's embed script and then each ad (commit 8e2a5e4). Checked on the real ads with the code at that commit: 3 of the 6 are published (posted within 120 days, Homely as the hiring organisation, live); 3 older ads without an end date (posted April 2026 and February 2024) are left out by the freshness rule."
+  ],
+  "items": [
+    {
+      "id": "912811042-site-0",
+      "company": "ADVOKAT HELLELAND",
+      "organisation_number": "912811042",
+      "type": "site",
+      "item": "https://www.helleland.one/",
+      "url": "https://www.helleland.one/",
+      "verdict": "right",
+      "evidence": "Homepage footer: \"Copyright © 2026 Advokat Helleland\"; a lawyer in Asker and Bærum, matching the registered address (Asker). No other firm named."
+    },
+    {
+      "id": "912811042-social-1",
+      "company": "ADVOKAT HELLELAND",
+      "organisation_number": "912811042",
+      "type": "social",
+      "item": "https://instagram.com/helleland",
+      "url": "https://instagram.com/helleland",
+      "verdict": "wrong",
+      "evidence": "instagram.com/helleland is \"Odd Martin Helleland\", a private personal account (66 followers) whose bio links helleland.one. The company is a sole proprietorship (ENK), and this is the owner's personal profile, not a company account. It came in through the rule that accepts an account named after the company's own domain."
+    },
+    {
+      "id": "994273728-site-0",
+      "company": "AER FABER AS",
+      "organisation_number": "994273728",
+      "type": "site",
+      "item": "https://www.aerfaber.no/",
+      "url": "https://www.aerfaber.no/",
+      "verdict": "right",
+      "evidence": "The site is about Aer Faber only (\"Aer Faber ble etablert i 2002\", 23 employees); the contact page gives \"Aer Faber AS, Næringsveien 13, Spydeberg\", the registered town. It runs on its owner Lindab's web platform (\"© Copyright 2025 - Lindab AS\"), but the domain and content are Aer Faber's own."
+    },
+    {
+      "id": "861031292-site-0",
+      "company": "AGRO BYGG & TEKNIKK AS",
+      "organisation_number": "861031292",
+      "type": "site",
+      "item": "https://www.agropumper.no/",
+      "url": "https://www.agropumper.no/",
+      "verdict": "right",
+      "evidence": "Footer: \"Agro Bygg & Teknikk AS, Bispeveien 1047, 3147 Revetal ... Orgnr: 861 031 292\"."
+    },
+    {
+      "id": "861031292-social-1",
+      "company": "AGRO BYGG & TEKNIKK AS",
+      "organisation_number": "861031292",
+      "type": "social",
+      "item": "https://facebook.com/agropumper",
+      "url": "https://facebook.com/agropumper",
+      "verdict": "right",
+      "evidence": "Facebook page \"Agro Pumper | Revetal\": \"Leverandør og spesialist på pumper, avløp, Flygt gjødselpumper og Eikerporten\"; linked from the company's own site footer; Revetal is the registered address."
+    },
+    {
+      "id": "861031292-social-2",
+      "company": "AGRO BYGG & TEKNIKK AS",
+      "organisation_number": "861031292",
+      "type": "social",
+      "item": "https://instagram.com/agropumper",
+      "url": "https://instagram.com/agropumper",
+      "verdict": "right",
+      "evidence": "Instagram \"Agro pumper\" (158 posts): \"Spesialist på pumper ... produsent av Eikerporten. Autorisert Flygt\"; the same business as the site, linked from its footer."
+    },
+    {
+      "id": "953079798-site-0",
+      "company": "BALLONG & PARTYGROSSISTEN AS",
+      "organisation_number": "953079798",
+      "type": "site",
+      "item": "https://www.partygrossisten.no/",
+      "url": "https://www.partygrossisten.no/",
+      "verdict": "right",
+      "evidence": "Footer: \"Copyright © 2026 Ballong & Partygrossisten AS\" (the exact legal name); the only other company named is the shop-software supplier."
+    },
+    {
+      "id": "919062223-site-0",
+      "company": "CUBIT AS",
+      "organisation_number": "919062223",
+      "type": "site",
+      "item": "https://www.cubit.no/",
+      "url": "https://www.cubit.no/",
+      "verdict": "right",
+      "evidence": "The homepage says only \"©Cubit\" (software for public services); the terms page names \"Cubit AS\" as the site's owner. A web search confirms Cubit AS (org. no. 919 062 223, Bergen area) makes fire and safety inspection software, which is what the site sells. Weakest evidence of the sample: no org. no. or address on the site."
+    },
+    {
+      "id": "924291370-site-0",
+      "company": "EEG LABORATORIET AS",
+      "organisation_number": "924291370",
+      "type": "site",
+      "item": "https://www.eeglaboratoriet.no/",
+      "url": "https://www.eeglaboratoriet.no/",
+      "verdict": "right",
+      "evidence": "The site is EEG-Laboratoriet's (\"Kontakt EEG-Laboratoriet, Sørkedalsveien 10 C, 0369 Oslo\"), a clinic in Oslo, the registered town of EEG LABORATORIET AS. No other company named."
+    },
+    {
+      "id": "924291370-news-1",
+      "company": "EEG LABORATORIET AS",
+      "organisation_number": "924291370",
+      "type": "news",
+      "item": "2025-12-16 \"Har du en nerveskade og venter på en nevrografisk undersøkel\"",
+      "url": "https://eeglaboratoriet.no/har-du-en-nerveskade-og-venter-pa-en-nevrografisk-undersokelse/",
+      "verdict": "right",
+      "evidence": "An article on the clinic's site; the page shows \"16 des\" and its publish date is 2025-12-16 (article:published_time 2025-12-16T12:03)."
+    },
+    {
+      "id": "924291370-news-2",
+      "company": "EEG LABORATORIET AS",
+      "organisation_number": "924291370",
+      "type": "news",
+      "item": "2025-12-16 \"Søvnvansker hos deg eller ditt barn? Få hjelp av søvnekspert\"",
+      "url": "https://eeglaboratoriet.no/sovnvansker-hos-deg-eller-ditt-barn-fa-hjelp-av-sovnekspert-til-a-bedre-sovnkvalitet-og-dognrytme/",
+      "verdict": "right",
+      "evidence": "An article on the clinic's site; the page shows \"16 des\", published 2025-12-16 (article:published_time 2025-12-16T11:53)."
+    },
+    {
+      "id": "924291370-news-3",
+      "company": "EEG LABORATORIET AS",
+      "organisation_number": "924291370",
+      "type": "news",
+      "item": "2025-05-07 \"Nakkesmerter med utstråling: Når bør du oppsøke lege?\"",
+      "url": "https://eeglaboratoriet.no/nakkesmerter-med-utstraling-nar-bor-du-oppsoke-lege/",
+      "verdict": "right",
+      "evidence": "An article on the clinic's site; the page shows \"07 mai\", published 2025-05-07 (article:published_time 2025-05-07T08:08)."
+    },
+    {
+      "id": "871545472-site-0",
+      "company": "FORENINGEN FOR OMPLASSERING AV DYR FOD",
+      "organisation_number": "871545472",
+      "type": "site",
+      "item": "https://www.FOD.no/",
+      "url": "https://www.FOD.no/",
+      "verdict": "right",
+      "evidence": "The site presents one organisation, \"Foreningen for omplassering av dyr\" (FOD), at FOD-gården, Enebakkveien 862, 1290 Oslo; Oslo is the registered town. Partners are listed as partners, not as a group."
+    },
+    {
+      "id": "871545472-social-1",
+      "company": "FORENINGEN FOR OMPLASSERING AV DYR FOD",
+      "organisation_number": "871545472",
+      "type": "social",
+      "item": "https://linkedin.com/company/fod-foreningen-for-omplassering-av-dyr",
+      "url": "https://linkedin.com/company/fod-foreningen-for-omplassering-av-dyr",
+      "verdict": "right",
+      "evidence": "LinkedIn page \"FOD - Foreningen for omplassering av dyr\": \"Foreningen for omplassering av dyr - FOD - ble stiftet i 1980\"."
+    },
+    {
+      "id": "871545472-news-2",
+      "company": "FORENINGEN FOR OMPLASSERING AV DYR FOD",
+      "organisation_number": "871545472",
+      "type": "news",
+      "item": "2026-10-20 \"Hvorfor betegnelsen «innekatt»?\"",
+      "url": "https://fod.no/hvorfor-betegnelsen-innekatt/",
+      "verdict": "right",
+      "evidence": "A blog post on fod.no, footer \"Foreningen for omplassering av dyr\"; the page shows \"20. oktober 2026\" under the breadcrumb."
+    },
+    {
+      "id": "871545472-news-3",
+      "company": "FORENINGEN FOR OMPLASSERING AV DYR FOD",
+      "organisation_number": "871545472",
+      "type": "news",
+      "item": "2026-07-25 \"Refleksjoner fra et adopsjonshjem – når hunden har utfordrin\"",
+      "url": "https://fod.no/refleksjoner-fra-et-adopsjonshjem-nar-hunden-har-utfordringer/",
+      "verdict": "right",
+      "evidence": "A blog post on fod.no; the page shows \"25. juli 2026\" right under the heading."
+    },
+    {
+      "id": "871545472-news-4",
+      "company": "FORENINGEN FOR OMPLASSERING AV DYR FOD",
+      "organisation_number": "871545472",
+      "type": "news",
+      "item": "2026-07-11 \"Hunder KARTLEGGES de første dagene på FOD-gården – hva gjør \"",
+      "url": "https://fod.no/hunder-kartlegges-de-forste-dagene-pa-fod-garden-hva-gjor-vi/",
+      "verdict": "right",
+      "evidence": "A blog post on fod.no; the page shows \"11. juli 2026\" above the heading."
+    },
+    {
+      "id": "871545472-jobs-5",
+      "company": "FORENINGEN FOR OMPLASSERING AV DYR FOD",
+      "organisation_number": "871545472",
+      "type": "jobs",
+      "item": "https://fod.no/ledig-stilling/",
+      "url": "https://fod.no/ledig-stilling/",
+      "verdict": "right",
+      "evidence": "The page says \"Vi har for tiden ingen ledige stillinger\" and lists no position."
+    },
+    {
+      "id": "923971025-site-0",
+      "company": "HAPRO AS",
+      "organisation_number": "923971025",
+      "type": "site",
+      "item": "https://www.hapro.no/",
+      "url": "https://www.hapro.no/",
+      "verdict": "right",
+      "evidence": "hapro.no is Hapro AS's own site: \"Konsernet Hapro består av morselskapet Hapro AS\" and its subsidiaries; Hapro AS is the parent itself, at Mohagasvingen 8, 2770 Jaren (the registered town)."
+    },
+    {
+      "id": "923971025-jobs-1",
+      "company": "HAPRO AS",
+      "organisation_number": "923971025",
+      "type": "jobs",
+      "item": "https://www.hapro.no/ledige-stillinger/",
+      "url": "https://www.hapro.no/ledige-stillinger/",
+      "verdict": "right",
+      "evidence": "The page lists no job itself and links to the group's Easycruit list, which holds two open applications, both at subsidiaries (Hapro Electronics AS; Hapro Jobb og Karriere AS). Nothing is open at Hapro AS itself."
+    },
+    {
+      "id": "820227492-site-0",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "site",
+      "item": "https://www.homely.no/",
+      "url": "https://www.homely.no/",
+      "verdict": "right",
+      "evidence": "The About page says \"Homely AS er registrert med organsiasjonsnummer 820 227 492\"."
+    },
+    {
+      "id": "820227492-social-1",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "social",
+      "item": "https://facebook.com/Homely-333999903979572",
+      "url": "https://facebook.com/Homely-333999903979572",
+      "verdict": "right",
+      "evidence": "Facebook page \"Homely\" (3,097 followers): \"Boligalarm - så trygt og enkelt som det burde være\", phone +47 22 53 53 00 and kundeservice@homely.no, the same as homely.no."
+    },
+    {
+      "id": "820227492-social-2",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "social",
+      "item": "https://instagram.com/homelynorge",
+      "url": "https://instagram.com/homelynorge",
+      "verdict": "right",
+      "evidence": "Instagram \"Homely\" (@homelynorge, 85 posts): \"Boligalarm, så trygt og enkelt som det burde være\", links homely.no."
+    },
+    {
+      "id": "820227492-news-3",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "news",
+      "item": "2026-05-11 \"Homely kåret til best på kundeservice innen boligalarm 2026\"",
+      "url": "https://www.homely.no/nyheter-homely-best-paa-kundeservice-boligalarm-2026/",
+      "verdict": "right",
+      "evidence": "A Homely press release on homely.no; no date is shown on the page, and its publish date is 2026-05-11 (article:published_time). The award date in the text (7 May) is not the post's date."
+    },
+    {
+      "id": "820227492-news-4",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "news",
+      "item": "2025-04-09 \"Fast pris for Petter Stordalen og Petter Uteligger\"",
+      "url": "https://www.homely.no/fast-pris-for-petter-stordalen-og-petter-uteligger/",
+      "verdict": "right",
+      "evidence": "A Homely press release on homely.no; no visible date, publish date 2025-04-09 (article:published_time)."
+    },
+    {
+      "id": "820227492-news-5",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "news",
+      "item": "2025-04-09 \"Homely-gründer kritiserer alarmgigantene for uetiske metoder\"",
+      "url": "https://www.homely.no/homely-grunder-kritiserer-alarmgigantene-for-winback-strategier/",
+      "verdict": "right",
+      "evidence": "A Homely press release on homely.no; no visible date, publish date 2025-04-09 (article:published_time)."
+    },
+    {
+      "id": "820227492-jobs-6",
+      "company": "HOMELY AS",
+      "organisation_number": "820227492",
+      "type": "jobs",
+      "item": "https://www.homely.no/om-oss/ledige-stillinger/",
+      "url": "https://www.homely.no/om-oss/ledige-stillinger/",
+      "verdict": "wrong",
+      "evidence": "The page says \"Vi i Homely søker nå flere flinke medarbeidere\" and links to Homely's Jobylon page, which lists six live ads (for example \"Business Developer\" and \"Salgsdirektør Feltsalg\"), each with Homely as the hiring organisation. The agent missed them: the Jobylon list is filled in by a script, so the agent saw an empty list."
+    },
+    {
+      "id": "875758632-site-0",
+      "company": "IDRETTSFORENINGEN FLØYA",
+      "organisation_number": "875758632",
+      "type": "site",
+      "item": "https://www.floya.no/",
+      "url": "https://www.floya.no/",
+      "verdict": "right",
+      "evidence": "Footer: organisasjonsnummer \"875 758 632\", IF Fløya, Dramsvegen 206, 9010 Tromsø. The site also presents the club's facility company Fløya Anlegg AS, but the site is the club's."
+    },
+    {
+      "id": "875758632-social-1",
+      "company": "IDRETTSFORENINGEN FLØYA",
+      "organisation_number": "875758632",
+      "type": "social",
+      "item": "https://facebook.com/Idrettsforeningen-Fl%C3%B8ya-148385095208468",
+      "url": "https://facebook.com/Idrettsforeningen-Fl%C3%B8ya-148385095208468",
+      "verdict": "right",
+      "evidence": "Facebook page \"Idrettsforeningen Fløya\": \"IF Fløya er en amatøridrettsklubb\", post@floya.no and floya.no."
+    },
+    {
+      "id": "875758632-news-2",
+      "company": "IDRETTSFORENINGEN FLØYA",
+      "organisation_number": "875758632",
+      "type": "news",
+      "item": "2026-10-07 \"Einerhagen Førjulsturnering 2026 🎄⚽\"",
+      "url": "https://www.floya.no/aktuelt/2026/floyadagen/",
+      "verdict": "right",
+      "evidence": "A club post on floya.no; the page shows \"7. oktober 2026\" under the heading \"Einerhagen Førjulsturnering 2026\" (published 2026-10-07)."
+    },
+    {
+      "id": "875758632-news-3",
+      "company": "IDRETTSFORENINGEN FLØYA",
+      "organisation_number": "875758632",
+      "type": "news",
+      "item": "2026-07-08 \"Agio Fotballskole ⚽🤩\"",
+      "url": "https://www.floya.no/aktuelt/2026/agio-fotballskole/",
+      "verdict": "right",
+      "evidence": "A club post; the page shows \"8. juli 2026\" under the heading."
+    },
+    {
+      "id": "875758632-news-4",
+      "company": "IDRETTSFORENINGEN FLØYA",
+      "organisation_number": "875758632",
+      "type": "news",
+      "item": "2026-06-17 \"Fløya Merch 😁⚽\"",
+      "url": "https://www.floya.no/aktuelt/2026/%f0%9f%92%9a%e2%9a%bd-floya-merch-%e2%9a%bd%f0%9f%92%9a/",
+      "verdict": "right",
+      "evidence": "A club post; the page shows \"17. juni 2026\" under the heading."
+    },
+    {
+      "id": "913416988-site-0",
+      "company": "INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE",
+      "organisation_number": "913416988",
+      "type": "site",
+      "item": "https://www.ikskole.no/",
+      "url": "https://www.ikskole.no/",
+      "verdict": "right",
+      "evidence": "The site is for one school, \"Indre Kåfjord Barne- og Ungdomsskole\" (title and footer), the exact registered name."
+    },
+    {
+      "id": "913416988-jobs-1",
+      "company": "INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE",
+      "organisation_number": "913416988",
+      "type": "jobs",
+      "item": "https://www.ikskole.no/ledige-stillinger.376367.no.html",
+      "url": "https://www.ikskole.no/ledige-stillinger.376367.no.html",
+      "verdict": "right",
+      "evidence": "The page says \"Vi har for tiden ingen ledige stillinger\"."
+    },
+    {
+      "id": "819511012-site-0",
+      "company": "INKERIA AS",
+      "organisation_number": "819511012",
+      "type": "site",
+      "item": "https://www.lappeliten.no/",
+      "url": "https://www.lappeliten.no/",
+      "verdict": "right",
+      "evidence": "Footer: \"© 2026 Lappeliten, en del av Inkeria AS\", Sandviksveien 73/75, 1363 Høvik (the registered town). Lappeliten is Inkeria AS's shop brand."
+    },
+    {
+      "id": "983351417-site-0",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "site",
+      "item": "https://www.inventura.no/",
+      "url": "https://www.inventura.no/",
+      "verdict": "right",
+      "evidence": "The site is Inventura's (offices in Bergen, Trondheim and Oslo; Bergen is the registered town). It says \"Inventura blir en del av EPSA Group\", but the site is Inventura's own, not EPSA's."
+    },
+    {
+      "id": "983351417-social-1",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "social",
+      "item": "https://instagram.com/inventurano",
+      "url": "https://instagram.com/inventurano",
+      "verdict": "right",
+      "evidence": "Instagram \"Inventura og Inventura Advokat\" (@inventurano): \"Ledende på å utvikle og forbedre innkjøpsdrevne verdikjeder\", links inventura.no. It is shared with Inventura's law unit, but it is Inventura's own account, not a parent's."
+    },
+    {
+      "id": "983351417-social-2",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "social",
+      "item": "https://linkedin.com/company/inventura-as",
+      "url": "https://linkedin.com/company/inventura-as",
+      "verdict": "right",
+      "evidence": "LinkedIn page \"Inventura AS\", Bergen: \"Norway's leading consultancy in procurement and supply chain management\"."
+    },
+    {
+      "id": "983351417-news-3",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "news",
+      "item": "2026-09-30 \"Inventura inngår samarbeid med Ignite\"",
+      "url": "https://www.inventura.no/fagblogg/samarbeid-med-ignite-om-datadrevet-radgivning/",
+      "verdict": "right",
+      "evidence": "An Inventura blog post; the page shows \"Publisert: 30.09.2026\"."
+    },
+    {
+      "id": "983351417-news-4",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "news",
+      "item": "2026-09-01 \"Gratis webinar: Er borettslaget klart for det neste store pr\"",
+      "url": "https://www.inventura.no/fagblogg/er-styret-i-borettslaget-klare-for-det-neste-store-prosjektet/",
+      "verdict": "right",
+      "evidence": "An Inventura blog post; the page shows \"Publisert: 01.09.2026\"."
+    },
+    {
+      "id": "983351417-news-5",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "news",
+      "item": "2026-08-31 \"Klima- og miljøhensyn etter lovendringen\"",
+      "url": "https://www.inventura.no/fagblogg/klima-og-miljohensyn-etter-lovendring/",
+      "verdict": "right",
+      "evidence": "An Inventura blog post; the page shows \"Publisert: 31.08.2026\"."
+    },
+    {
+      "id": "983351417-jobs-6",
+      "company": "INVENTURA AS",
+      "organisation_number": "983351417",
+      "type": "jobs",
+      "item": "https://www.inventura.no/karriere-innen-innkjop/jobbe-hos-oss/",
+      "url": "https://www.inventura.no/karriere-innen-innkjop/jobbe-hos-oss/",
+      "verdict": "right",
+      "evidence": "The careers page lists no specific position; its \"Søk jobb\" page offers only an open application for consultant work (via contikiressurser.no), not a job ad."
+    },
+    {
+      "id": "983807801-site-0",
+      "company": "PERSONALTJENESTER TELEMARK AS",
+      "organisation_number": "983807801",
+      "type": "site",
+      "item": "https://www.personaltjenester.no/",
+      "url": "https://www.personaltjenester.no/",
+      "verdict": "right",
+      "evidence": "The site is one staffing company, \"Personaltjenester\", Telemark og Agder (\"Godkjent bemanningsbyrå hos Arbeidstilsynet\"). The homepage does not give the legal name; the registered name is PERSONALTJENESTER TELEMARK AS, in Skien, and the vacancies page names \"Personaltjenester Telemark AS\"."
+    },
+    {
+      "id": "983807801-jobs-1",
+      "company": "PERSONALTJENESTER TELEMARK AS",
+      "organisation_number": "983807801",
+      "type": "jobs",
+      "item": "https://www.personaltjenester.no/ledige-stillingerd352e481",
+      "url": "https://www.personaltjenester.no/ledige-stillingerd352e481",
+      "verdict": "can't tell",
+      "evidence": "The page lists six vacancies. Two are for named clients (You Brands; \"Arbeidsgiver: John Kleveland AS\") and one says \"Vi søker for kunde\". Three (welder, turner, mechanics/electricians/plumbers) name no employer and say to contact Knut at Personaltjenester, so they may be the agency's own hires for leasing out, or client jobs. Not listing them is safe, but it may miss openings."
+    },
+    {
+      "id": "990688087-site-0",
+      "company": "STIFTELSEN GAMMELSETRA",
+      "organisation_number": "990688087",
+      "type": "site",
+      "item": "https://www.innergammelsetra.no/",
+      "url": "https://www.innergammelsetra.no/",
+      "verdict": "right",
+      "evidence": "The site is for the mountain farm \"Inner gammelsetra\", with its address at Røymoen 55, 6613 Gjøra, the registered town of STIFTELSEN GAMMELSETRA. It does not spell out the foundation's legal name; the footer credit \"© AtiCon Data DA\" is the web maker's."
+    },
+    {
+      "id": "990688087-social-1",
+      "company": "STIFTELSEN GAMMELSETRA",
+      "organisation_number": "990688087",
+      "type": "social",
+      "item": "https://facebook.com/innergammelsetra",
+      "url": "https://facebook.com/innergammelsetra",
+      "verdict": "right",
+      "evidence": "Facebook page \"Inner Gammelsetra i Grøvudalen\", Røymoen 75, Gjøra, post@innergammelsetra.no and innergammelsetra.no: the seter the foundation runs."
+    },
+    {
+      "id": "990688087-social-2",
+      "company": "STIFTELSEN GAMMELSETRA",
+      "organisation_number": "990688087",
+      "type": "social",
+      "item": "https://instagram.com/innergammelsetra",
+      "url": "https://instagram.com/innergammelsetra",
+      "verdict": "right",
+      "evidence": "Instagram \"Inner Gammelsetra i Grøvudalen\" (502 posts) about the youth-run seter in Sunndalsfjella; same seter as the site."
+    },
+    {
+      "id": "966419482-site-0",
+      "company": "TRE TEAM ENTREPRENØR AS",
+      "organisation_number": "966419482",
+      "type": "site",
+      "item": "https://www.treteam.com/",
+      "url": "https://www.treteam.com/",
+      "verdict": "right",
+      "evidence": "Footer: \"Foretaksnr. 966419482 ... Tre Team Entreprenør AS, Måseveien 2, 8300 Svolvær\"."
+    },
+    {
+      "id": "966419482-news-1",
+      "company": "TRE TEAM ENTREPRENØR AS",
+      "organisation_number": "966419482",
+      "type": "news",
+      "item": "2026-06-25 \"Sommerferie 2026\"",
+      "url": "https://www.treteam.no/2026/06/25/sommerferie-2026/",
+      "verdict": "right",
+      "evidence": "A notice in the company's \"Aktuelt\" section; no date is shown on the page, and the site's feed and the post's address both give 2026-06-25."
+    },
+    {
+      "id": "966419482-news-2",
+      "company": "TRE TEAM ENTREPRENØR AS",
+      "organisation_number": "966419482",
+      "type": "news",
+      "item": "2025-12-19 \"Juleferie 2025\"",
+      "url": "https://www.treteam.no/2025/12/19/juleferie-2025/",
+      "verdict": "right",
+      "evidence": "A notice in \"Aktuelt\"; the feed and the address both give 2025-12-19."
+    },
+    {
+      "id": "966419482-news-3",
+      "company": "TRE TEAM ENTREPRENØR AS",
+      "organisation_number": "966419482",
+      "type": "news",
+      "item": "2025-07-04 \"Sommerferie\"",
+      "url": "https://www.treteam.no/2025/07/04/sommerferie-4/",
+      "verdict": "right",
+      "evidence": "A notice in \"Aktuelt\"; the feed and the address both give 2025-07-04."
+    },
+    {
+      "id": "966419482-jobs-4",
+      "company": "TRE TEAM ENTREPRENØR AS",
+      "organisation_number": "966419482",
+      "type": "jobs",
+      "item": "https://www.treteam.no/jobb-hos-oss/",
+      "url": "https://www.treteam.no/jobb-hos-oss/",
+      "verdict": "right",
+      "evidence": "The page has only an open-application form (\"send en epost til oss for en uformell jobbsøknad\"), no job ad."
+    }
+  ]
+}

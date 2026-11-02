@@ -19,7 +19,7 @@
     "other_careers_pages": [
       "983807801 PERSONALTJENESTER TELEMARK AS: a staffing agency whose page lists vacancies at client companies, not at itself (none taken)",
       "923971025 HAPRO AS: links to the whole Hapro group's list on Easycruit (none taken)",
-      "820227492 HOMELY AS: the three Jobylon ads found in the version 4 check are no longer on the page (none taken)",
+      "820227492 HOMELY AS: the page links only to Homely's Jobylon list, which a script fills in, so no ad was taken. The cross-check found six live ads there; the agent now reads that list (commit 8e2a5e4; see examples/cross-check-v5.json)",
       "983351417 INVENTURA AS, 966419482 TRE TEAM ENTREPRENØR AS, 971277270 SAMFUNNSVITERNE: no single ad on the page (none taken)"
     ],
     "job_ads_published_from_websites": 0

@@ -19,7 +19,8 @@ Builderr's feedback on the latest run named three fixes and one way to go furthe
 - Jobs: two careers pages say "Vi har for tiden ingen ledige stillinger" (Indre Kåfjord school, FOD), and no jobs were taken from them. A staffing agency's list of its clients' vacancies and a group-wide list on Easycruit were not taken either.
 - News: FOD's 10 posts came from its news page's feed at the standard WordPress address, which the site does not declare.
 - Two news errors were found and fixed: a web shop's product feed read as news (lappeliten.no), and a homepage card dated by the day an office reopens instead of its publish date (treteam.no).
-- A sample of these companies is being checked by hand by a person, item by item (see "Hand check" under Tests).
+- Claude cross-checked a sample of 16 of these companies item by item: 49 of 52 items right. It found two more errors, both fixed: a sole proprietor's personal Instagram account published as the firm's (helleland.one), and Homely's live job ads missed because its Jobylon list is filled in by a script.
+- The same sample is being checked by hand by a person (see "Hand check" under Tests).
 
 ## What's new in version 4
 
@@ -117,7 +118,7 @@ Optional flags and environment variables:
 - **Profiles only for this exact company.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name (give or take the legal form, a country word such as "norge", or digits), or the name of the company's own verified domain (its brand, as "agropumper" on agropumper.no). A long name may drop one word in its handle, but never its place or country word, so a national body's account is not a local unit's. The domain rule is not used for a sole proprietorship (its domain is usually the owner's name, so such an account is the owner's personal profile), on a page of someone else's site, for a domain with a group word, for a country arm, region or city unit ("Certego Norge AS" on certego.no), on a site that says it is part of a group, or when another company named on the site carries the brand ("Treteam AS", "Treteam Holding AS"). A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out, and so is any link whose text or icon label names a group or another company. Share buttons and personal profiles are ignored.
 - **Contacts without personal data.** Email links are taken only on the site's own domain and only for role addresses (post@, salg@, kundeservice@ and similar), never a staff member's own address. Only the site's main phone number is taken.
 - **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page or the homepage (never a neighbour's), its structured data (`datePublished`), or the site's own feed (RSS `pubDate`, Atom `published`): the one it declares or, when it declares none, the standard address of the common site builders (WordPress `/feed/`, Wix `/blog-feed.xml`). Feed `lastBuildDate` and `<updated>` are never used, and comment feeds, product feeds and posts on other sites are left out. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
-- **Jobs are single, live ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform, including the ads on a company's Jobylon list that its careers page links to (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title), and structured `JobPosting` data that links to its own ad and names this company. Every ad page is opened and must show a live opening: it names the job, does not say the position is closed or that there are no openings, and does not redirect back to a list. A careers page that says there are no open positions gives no openings at all. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications and expired or undated postings are left out.
+- **Jobs are single, live ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform, including the ads on a company's Jobylon list that its careers page links to (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title), and structured `JobPosting` data that links to its own ad and names this company. Every ad page is opened and must show a live opening: it names the job, does not say the position is closed or that there are no openings, and does not redirect back to a list. A careers page that says there are no open positions gives no openings at all. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications, and expired or undated postings (or postings without an end date that are more than 120 days old) are left out.
 - **No press search.** News comes only from the company's own verified website. A search of news media by company name was tested: the only free news search that runs without a key (GDELT) found nothing for Barnekreftforeningen, a well-known national charity, over six months, and the other test queries failed. Most companies in the register are small, so a name search would return little, and what it returned would include namesakes, which breaks the exact-identity rule. Paid news APIs need keys, and this agent needs none.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
@@ -198,7 +199,7 @@ Details are in [`examples/live-test-v4-report.json`](examples/live-test-v4-repor
 Details of that test are in [`examples/live-test-v3-report.json`](examples/live-test-v3-report.json).
 
 **Live check of version 5 (1 November 2026):** the version 5 rules were re-run on the registered websites of the same 1,000 companies that version 4 publishes (63 sites; 46 verified as the company's own and read, 15 did not load).
-- Jobs: 8 careers pages read. Two say there are no open positions (Indre Kåfjord school, FOD), and no jobs were taken from them; a staffing agency's clients' vacancies and a group-wide list were not taken either. No single ad for these companies was on any of the pages.
+- Jobs: 8 careers pages read. Two say there are no open positions (Indre Kåfjord school, FOD), and no jobs were taken from them; a staffing agency's clients' vacancies and a group-wide list were not taken either. Homely's page links only to its Jobylon list, which a script fills in, so no ads were taken; the cross-check below found live ads there, and the agent now reads such lists.
 - Social: 44 accounts published. 11 were left out, for example a handle with a place word ("fodoslo") or a brand account on a site that names another company carrying the brand (Treteam AS). These rules leave out an account that may be right rather than publish a parent's.
 - News: dated posts for 9 companies, including 10 from a feed found at the standard WordPress address.
 - Found and fixed: a web shop's product feed read as news, and a homepage card dated by an office's reopening day instead of the post's publish date.
@@ -206,6 +207,20 @@ Details of that test are in [`examples/live-test-v3-report.json`](examples/live-
 Details are in [`examples/live-test-v5-report.json`](examples/live-test-v5-report.json).
 
 **Hand check:** a sample of the version 5 output is being checked by a person, not a model: 16 of the companies above (12 drawn at random, and 4 whose careers pages the agent read). For each website, social account, news post and job decision she opens the source and marks it right or wrong; accuracy by source type will be reported here. To draw such a sample from any run: `npx tsx scripts/handcheck-sample.ts out/envelopes.jsonl handcheck-sample.json 15`.
+
+**Cross-check by Claude (2 November 2026):** the same 52 items were also checked by Claude, opening each source and reading it as a person would, without the agent's code. This is a model's check, kept separate from the hand check above.
+
+| Source | Items | Right | Wrong | Can't tell |
+|---|---|---|---|---|
+| Site | 16 | 16 | 0 | 0 |
+| Social | 11 | 10 | 1 | 0 |
+| News | 18 | 18 | 0 | 0 |
+| Jobs | 7 | 5 | 1 | 1 |
+
+- Wrong, now fixed: a sole proprietor's private Instagram account, named after the owner like the firm's domain (only a handle with the whole business name counts for a sole proprietorship now); and Homely's live Jobylon ads, missed because a script fills in the list (the agent now reads the list's embed script, then each ad). On Homely's real ads, 3 of 6 are now published; 3 older ads without an end date are left out by the 120-day freshness rule.
+- Can't tell: three of a staffing agency's vacancies name no employer, so they may be its own hires or its clients'. None are published.
+
+Every verdict, with the evidence seen, is in [`examples/cross-check-v5.json`](examples/cross-check-v5.json).
 
 To smoke-test against the live registry on a random sample of real companies:
 
