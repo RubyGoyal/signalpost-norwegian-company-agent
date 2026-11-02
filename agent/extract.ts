@@ -361,8 +361,68 @@ const ACTIVITY_LABELS: [RegExp, string][] = [
   [/^\/epostadresse|^\/telefon|^\/mobil/, 'contact details changed'],
   [/^\/paategninger/, 'registry notice changed'],
 ];
+/**
+ * The calendar day of a registry timestamp, always taken in UTC. The update feed gives instants
+ * such as "2026-10-13T22:04:38.138Z": the register's nightly updates land just after midnight
+ * Norwegian time, which is still the previous day in UTC, and that UTC day is the day the
+ * register itself files the change under (its own registration dates). A timestamp written with
+ * an offset ("2026-10-14T00:04:38+02:00") or with no zone at all (Norwegian local time) is
+ * converted first, so the same event keeps the same day on every run.
+ */
+export function utcDay(raw: string): string {
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i);
+  if (!m) return s.slice(0, 10);
+  const [, y, mo, d, h, mi, sec = '0', frac = '', zone] = m;
+  const wall = Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec, Math.round(Number(frac || 0) * 1000));
+  let ms: number;
+  if (zone && /^z$/i.test(zone)) ms = wall;
+  else if (zone) {
+    const z = zone.replace(':', '');
+    const sign = z[0] === '-' ? -1 : 1;
+    ms = wall - sign * (Number(z.slice(1, 3)) * 60 + Number(z.slice(3, 5))) * 60_000;
+  } else ms = wall - osloOffsetMs(wall);
+  return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : s.slice(0, 10);
+}
+
+/** Europe/Oslo's offset from UTC (in ms) around the given instant: +1 h in winter, +2 h in summer. */
+function osloOffsetMs(utcMs: number): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Oslo',
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(new Date(utcMs));
+    const n = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const local = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'));
+    const off = local - Math.floor(utcMs / 60_000) * 60_000;
+    return Number.isFinite(off) ? off : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * True when two registry events (same update id) differ only in a day or less of their date.
+ * That is a difference in how the feed wrote the timestamp, not a change in the register.
+ */
+export function sameRegistryEvent(a: unknown, b: unknown): boolean {
+  const x = a as any;
+  const y = b as any;
+  if (!x || !y || typeof x !== 'object' || typeof y !== 'object' || typeof x.date !== 'string' || typeof y.date !== 'string') return false;
+  const days = Math.abs(Date.parse(x.date.slice(0, 10)) - Date.parse(y.date.slice(0, 10))) / 864e5;
+  if (!(days <= 1)) return false;
+  const rest = (v: any) => JSON.stringify({ event: v.event ?? null, change_type: v.change_type ?? null, fields: [...(v.fields || [])].sort() });
+  return rest(x) === rest(y);
+}
+
 // Values safe to quote in the activity text (no personal data).
-const QUOTABLE = /^\/(navn|antallAnsatte|sisteInnsendteAarsregnskap|hjemmeside|konkurs|underAvvikling|registrertIMvaregisteret)$/;
+const QUOTABLE =/^\/(navn|antallAnsatte|sisteInnsendteAarsregnskap|hjemmeside|konkurs|underAvvikling|registrertIMvaregisteret)$/;
 
 export function extractActivity(b: ClaimBuilder, snap: SourceSnapshot, page: any, offset: number) {
   const items = Array.isArray(page?._embedded?.oppdaterteEnheter) ? page._embedded.oppdaterteEnheter : [];
@@ -398,9 +458,9 @@ export function extractActivity(b: ClaimBuilder, snap: SourceSnapshot, page: any
       'public_activity',
       'registry_event',
       String(u.oppdateringsid),
-      { date: date.slice(0, 10), event: summary, change_type: type, fields: [...labels] },
+      { date: utcDay(date), event: summary, change_type: type, fields: [...labels] },
       `$._embedded.oppdaterteEnheter[${i}]`,
-      { sourceDate: date.slice(0, 10) }
+      { sourceDate: utcDay(date) }
     );
   });
   void offset;

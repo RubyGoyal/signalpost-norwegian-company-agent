@@ -1,0 +1,43 @@
+{
+  "what": "Exploratory QA of the deployed Signalpost web app by Momentic's QA agent (Mo), from a written brief, with no access to the code. Summary of its report; screenshots are kept by the project owner.",
+  "date": "2026-11-02",
+  "target": "https://signalpost-g4p5.onrender.com/",
+  "tested_commit": "a5508d7f59f439b179f0df7872909bc9a3a32d40",
+  "limits_followed": "No sign-in, no external forms submitted, under 30 company look-ups, exactly one registry re-check per company.",
+  "companies_checked_in_depth": [
+    { "organisation_number": "923609016", "name": "EQUINOR ASA", "result": "Six source kinds checked; registry, roles, accounts, sub-units and contacts agree; all ten news dates match the feed; website and social links trace to the company's site." },
+    { "organisation_number": "974456923", "name": "FLEXIFORM AS", "result": "Registry, roles, sub-unit, accounts 2023 to 2025 and contacts agree; all 75 detailed facts have source links; website and Facebook/LinkedIn identity agree." },
+    { "organisation_number": "820227492", "name": "HOMELY AS", "result": "All 90 detailed facts linked; the three published vacancies are single live Homely ads; three more live ads on its Jobylon list were left out (issue 6)." }
+  ],
+  "verdict_by_scope": {
+    "look_up": "verified",
+    "company_profiles": "issues found",
+    "re_check_registry": "issues found",
+    "batch_results": "verified",
+    "how_it_works": "issues found",
+    "direct_addresses_and_navigation": "verified",
+    "usability_and_accessibility": "issues found"
+  },
+  "issues": [
+    { "id": 1, "severity": "low", "where": "Equinor profile, What was found", "found": "Hiring tile showed the internal code \"checked nav no active ads last 60 days\".", "fix": "Every availability reason is shown in plain words.", "status": "fixed" },
+    { "id": 2, "severity": "low", "where": "Flexiform profile, What was found", "found": "Same internal code on the Hiring tile.", "fix": "As issue 1.", "status": "fixed" },
+    { "id": 3, "severity": "medium", "where": "Equinor, Re-check registry", "found": "Twelve historical registry events moved one day later and were reported as changes (for example the employee count update of 2026-10-13, feed time 22:04 UTC, shown as 2026-10-14).", "fix": "Event dates are the UTC day of the feed's timestamp however it is written (Z, an offset, or Norwegian local time); an event with the same update id and content is never reported as changed for a one-day difference.", "tests": ["registry timestamps: the same instant gets the same UTC day", "QA run (Equinor): the same registry update written with a Norwegian time offset keeps its day and is not reported as a change"], "status": "fixed" },
+    { "id": 4, "severity": "low", "where": "Equinor summary after the re-check", "found": "The Changes sentence printed raw JSON objects.", "fix": "Every change is written in words.", "tests": ["QA run (Equinor): the summary's change list is written in words, never raw JSON"], "status": "fixed" },
+    { "id": 5, "severity": "medium", "where": "Flexiform summary, At a glance", "found": "Revenue and growth were followed only by an Enhetsregisteret link.", "fix": "The envelope already cited the accounts; the app showed only the first three evidence items, all from Enhetsregisteret. It now shows every distinct source behind a sentence.", "status": "fixed" },
+    { "id": 6, "severity": "medium", "where": "Homely profile, Hiring", "found": "3 of the 6 ads on Homely's live Jobylon list were left out (posted 2024-02-28, 2026-03-17 and 2026-04-28, no end date, still open).", "fix": "An ad that the employer's own live job list still carries is an opening whatever its age; its own page must still be live and name the company.", "tests": ["jobs (QA run, homely.no): an old ad on the employer's live Jobylon list is an opening; one whose page says it is closed is not"], "status": "fixed" },
+    { "id": 7, "severity": "medium", "where": "How it works, Sources and licence", "found": "The Regnskapsregisteret link (the API root) returned 404.", "fix": "Links the official dataset page on data.norge.no.", "status": "fixed" },
+    { "id": 8, "severity": "low", "where": "How it works at 375 px", "found": "The run command needed sideways scrolling.", "fix": "Commands wrap.", "status": "fixed" },
+    { "id": 9, "severity": "low", "where": "Profile, Sources consulted at 375 px", "found": "The sources table needed sideways scrolling.", "fix": "On a phone each source is one block with its result, time and hash.", "status": "fixed" },
+    { "id": 10, "severity": "medium", "where": "Compare at 375 px", "found": "The second company was off screen.", "fix": "On a phone each fact lists every company under it.", "status": "fixed" }
+  ],
+  "also_noted": [
+    { "found": "A filter that matches nothing showed only the table headers (not confirmed as a defect).", "fix": "Says \"No companies match this filter\" with a button to clear the filters." },
+    { "found": "The How it works page still described version 4 (no news or careers pages).", "fix": "Updated to version 5." }
+  ],
+  "not_verified_by_the_qa_agent": [
+    "That NAV has no active ads for the three companies (the NAV feed needs a token in a browser).",
+    "Content of social accounts behind a login (Instagram, Facebook, X security check); ownership was confirmed from the companies' own sites.",
+    "An untouched batch table of exactly 10 companies (live look-ups are added to it, as the page says).",
+    "The missing-employee-count and no-dated-items branches (no such company within the allowed look-ups)."
+  ]
+}

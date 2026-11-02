@@ -148,7 +148,37 @@ const REASON_TEXT: Record<string, string> = {
   no_verified_website: 'No verified website to read from',
   found_on_company_website: 'Found on its website',
   found_on_company_website_nav_unavailable: 'Found on its website (NAV unavailable this run)',
+  no_industry_code_registered: 'Checked: none registered',
+  no_address_registered: 'Checked: none registered',
+  no_status_registered: 'Checked: none registered',
+  registered_website_belongs_to_another_entity: "Registered site is another company's",
+  registered_website_is_a_directory_listing: 'Registered site is a directory listing',
+  registered_website_is_a_social_profile: 'Registered site is a social profile',
+  registered_website_not_reachable: 'Registered site could not be reached',
+  registered_website_not_verified: 'Registered site does not name this company',
+  registered_website_shows_several_companies: 'Ambiguous: registered site lists several companies',
+  site_not_allowed: 'Site does not allow automated access',
+  site_shows_a_different_organisation_number: 'Site shows a different org. number',
+  site_shows_several_companies: 'Ambiguous: site lists several companies',
+  source_request_failed: 'Source could not be read this run',
+  invalid_organisation_number: 'Invalid organisation number',
+  website_time_budget_reached: 'Website check ran out of time',
+  switched_off: 'Not checked in this run',
+  public_web_unreachable: 'Websites could not be reached this run',
 };
+
+/** Plain words for an availability reason, including the ones that carry a number. */
+function reasonLabel(reason: string): string {
+  if (REASON_TEXT[reason]) return REASON_TEXT[reason];
+  const nav = reason.match(/^checked_nav_no_active_ads_last_(\d+)_days(_and_careers_page_says_no_open_positions)?$/);
+  if (nav) return nav[2] ? 'Checked: none on NAV, and its careers page says none are open' : `Checked: no active NAV job ads (last ${nav[1]} days)`;
+  const first = reason.match(/^found_in_source_first_(\d+)_(only|candidates_checked)$/);
+  if (first) return `Found (first ${first[1]} checked)`;
+  const via = reason.match(/^verified_on_site_via_(.+)$/);
+  if (via) return `Verified on the site (${via[1].replace(/_/g, ' ')})`;
+  const words = reason.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 const fmtNum = (n: number) => n.toLocaleString('en-US');
 const fmtDate = (iso?: string | null) => (iso ? iso.slice(0, 10) : '—');
@@ -284,12 +314,13 @@ function Card({ title, children, right }: { title: string; children: ReactNode; 
   );
 }
 
-function SourceLinks({ ids, evidence, snapshots }: { ids: string[]; evidence: Map<string, Evidence>; snapshots: Map<string, string> }) {
+function SourceLinks({ ids, evidence, snapshots, max = 6 }: { ids: string[]; evidence: Map<string, Evidence>; snapshots: Map<string, string>; max?: number }) {
   const seen = new Set<string>();
-  // One link per source document, even when several facts come from it.
-  const evs = (ids.map((id) => evidence.get(id)).filter(Boolean) as Evidence[]).filter((e) =>
-    seen.has(e.snapshot_id) ? false : (seen.add(e.snapshot_id), true)
-  );
+  // One link per source document, even when several facts come from it. The cap counts distinct
+  // documents, so a sentence that draws on the registry and the accounts links to both.
+  const evs = (ids.map((id) => evidence.get(id)).filter(Boolean) as Evidence[])
+    .filter((e) => (seen.has(e.snapshot_id) ? false : (seen.add(e.snapshot_id), true)))
+    .slice(0, max);
   if (!evs.length) return null;
   return (
     <span className="inline-flex flex-wrap gap-x-2">
@@ -478,7 +509,7 @@ function CompanyView({ orgnr }: { orgnr: string }) {
                 key={i}
                 className={`text-sm leading-relaxed text-slate-800 ${isNew ? 'px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg' : ''} ${s.text.startsWith('At a glance:') ? 'font-medium' : ''}`}
               >
-                {s.text} <SourceLinks ids={s.evidence_ids.slice(0, isNew ? 6 : 3)} evidence={evidence} snapshots={snapshots} />
+                {s.text} <SourceLinks ids={s.evidence_ids} max={isNew ? 6 : 4} evidence={evidence} snapshots={snapshots} />
               </li>
             );
           })}
@@ -498,7 +529,7 @@ function CompanyView({ orgnr }: { orgnr: string }) {
                     ? `${e.claims.filter((c) => c.family === f).length} fact${e.claims.filter((c) => c.family === f).length === 1 ? '' : 's'}`
                     : a.state === 'failed'
                     ? 'Source unavailable'
-                    : REASON_TEXT[a.reason] || a.reason.replace(/_/g, ' ')}
+                    : reasonLabel(a.reason)}
                 </div>
               </div>
             );
@@ -570,7 +601,24 @@ function CompanyView({ orgnr }: { orgnr: string }) {
 
       {/* Sources */}
       <Card title="Sources consulted">
-        <div className="overflow-x-auto">
+        {/* Phones: one block per source, so nothing needs sideways scrolling. */}
+        <ul className="sm:hidden divide-y divide-slate-100 text-sm">
+          {e.source_snapshots.map((s) => (
+            <li key={s.id} className="py-2 space-y-0.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <a href={s.source_url} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline inline-flex items-center gap-1 min-w-0">
+                  {SOURCE_LABELS[s.source]} <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+                </a>
+                <span className="shrink-0 text-slate-700">{s.ok ? 'OK' : s.error || `HTTP ${s.http_status}`}</span>
+              </div>
+              <div className="font-mono text-xs text-slate-500 break-all">
+                {fmtDateTime(s.retrieved_at)}
+                {s.content_sha256 ? ` · hash ${s.content_sha256.slice(0, 12)}` : ''}
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-500">
@@ -596,7 +644,10 @@ function CompanyView({ orgnr }: { orgnr: string }) {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-slate-500">All data from Brønnøysundregistrene open APIs (NLOD 2.0). Birth dates of role holders are not shown.</p>
+        <p className="mt-3 text-xs text-slate-500">
+          Registry facts come from Brønnøysundregistrene's open APIs (NLOD 2.0), job ads from NAV's job feed or the company's own careers page, and website, profile and news facts from
+          the company's own verified website. Birth dates of role holders are not shown.
+        </p>
       </Card>
     </div>
   );
@@ -718,7 +769,7 @@ function BatchView() {
           <p>
             Run the agent on a file of organisation numbers, then reload this page:
           </p>
-          <pre className="text-xs bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto">npx tsx agent/run.ts examples/sample-orgnrs.txt out</pre>
+          <pre className="text-xs bg-slate-900 text-slate-100 rounded-lg p-3 whitespace-pre-wrap break-words">npx tsx agent/run.ts examples/sample-orgnrs.txt out</pre>
           <p>Or look up a single company with the search box above.</p>
         </div>
       ) : (
@@ -769,6 +820,24 @@ function BatchView() {
                   <td className="px-3 py-2"><StatePill state={r.state} /></td>
                 </tr>
               ))}
+              {data && data.filtered === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-6 text-center text-slate-600">
+                    No companies match this filter.{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQ('');
+                        setState('all');
+                        setPage(1);
+                      }}
+                      className="text-blue-700 hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -827,13 +896,62 @@ function CompareView({ orgnrs }: { orgnrs: string[] }) {
     ['Latest website news', (e) => e.claims.filter((c) => c.field === 'site_news').sort((a, b) => String((b.value as any).date).localeCompare(String((a.value as any).date)))[0]],
   ];
 
+  const cell = (e: Envelope | null, pick: (e: Envelope) => Claim | undefined) => {
+    const c = e ? pick(e) : undefined;
+    const ev = c && e ? e.evidence.find((x) => x.id === c.evidence_ids[0]) : undefined;
+    return c ? (
+      <>
+        {formatValue(c)}
+        {c.reporting_period && <div className="text-xs text-slate-500">FY {c.reporting_period.from} → {c.reporting_period.to}</div>}
+        {ev && (
+          <a href={ev.source_url} target="_blank" rel="noreferrer" className="ml-1 inline-flex align-middle text-blue-700" title={ev.source_url}>
+            <ExternalLink className="w-3 h-3" aria-label="Source" />
+          </a>
+        )}
+      </>
+    ) : (
+      <span className="text-slate-400">Not available</span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Compare companies</h1>
         <a href="#/batch" className="text-sm text-blue-700 hover:underline">Back to batch results</a>
       </div>
-      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+      {/* Phones: each fact lists every company under it, so nothing is off screen. */}
+      <div className="sm:hidden bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+        <div className="px-3 py-2 bg-slate-50 rounded-t-xl text-sm space-y-0.5">
+          {envs.map((e, i) => (
+            <div key={i}>
+              <span className="text-xs text-slate-500">{String.fromCharCode(65 + i)}. </span>
+              {e ? (
+                <a href={`#/company/${e.organisation_number}`} className="font-semibold text-blue-700 hover:underline">
+                  {e.legal_identity?.legal_name || e.organisation_number}
+                </a>
+              ) : (
+                orgnrs[i]
+              )}{' '}
+              <span className="text-xs font-mono text-slate-500">{orgnrs[i]}</span>
+            </div>
+          ))}
+        </div>
+        {rows.map(([label, pick]) => (
+          <div key={label} className="px-3 py-2 text-sm">
+            <div className="text-xs font-medium text-slate-500">{label}</div>
+            <dl className="mt-1 space-y-1">
+              {envs.map((e, i) => (
+                <div key={i} className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-1 break-words">
+                  <dt className="text-xs text-slate-500 pt-0.5">{String.fromCharCode(65 + i)}</dt>
+                  <dd>{cell(e, pick)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+      </div>
+      <div className="hidden sm:block bg-white border border-slate-200 rounded-xl overflow-x-auto">
         <table className="w-full text-sm min-w-[36rem]">
           <thead className="bg-slate-50 text-left">
             <tr>
@@ -856,27 +974,11 @@ function CompareView({ orgnrs }: { orgnrs: string[] }) {
             {rows.map(([label, pick]) => (
               <tr key={label}>
                 <td className="px-3 py-2 text-slate-500">{label}</td>
-                {envs.map((e, i) => {
-                  const c = e ? pick(e) : undefined;
-                  const ev = c && e ? e.evidence.find((x) => x.id === c.evidence_ids[0]) : undefined;
-                  return (
-                    <td key={i} className="px-3 py-2 align-top">
-                      {c ? (
-                        <>
-                          {formatValue(c)}
-                          {c.reporting_period && <div className="text-xs text-slate-500">FY {c.reporting_period.from} → {c.reporting_period.to}</div>}
-                          {ev && (
-                            <a href={ev.source_url} target="_blank" rel="noreferrer" className="ml-1 inline-flex align-middle text-blue-700" title={ev.source_url}>
-                              <ExternalLink className="w-3 h-3" aria-label="Source" />
-                            </a>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-slate-400">Not available</span>
-                      )}
-                    </td>
-                  );
-                })}
+                {envs.map((e, i) => (
+                  <td key={i} className="px-3 py-2 align-top">
+                    {cell(e, pick)}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -904,25 +1006,26 @@ function AboutView() {
           <li>Takes a Norwegian organisation number and checks its modulus-11 check digit.</li>
           <li>Reads the official Brønnøysund registers for that exact number: the entity register, roles, sub-units, filed annual accounts and the registry's dated change log. Checks NAV's job feed for active job ads.</li>
           <li>Finds the company's official website (registered website, registered email domain, or a domain spelled from its name) and publishes it only when the site proves it is the same company: its organisation number on the site, or its exact name plus the registered phone number or address.</li>
-          <li>Publishes only values the registers hold. Each fact links to the source, with retrieval time and, for accounts, the reporting period.</li>
+          <li>From that verified website only, it reads the company's own social profiles, its dated news posts (news page, news feed or front page) and its careers page, including the single job ads the careers page links to.</li>
+          <li>Each fact links to its source, with retrieval time and, for accounts, the reporting period.</li>
           <li>On a re-check, compares with the previous snapshot and lists real changes only, keeping the earlier evidence.</li>
         </ol>
       </Card>
       <Card title="Rules it follows">
         <ul className="list-disc pl-5 space-y-2 text-sm text-slate-800">
-          <li>Every fact is matched by exact organisation number, so it cannot belong to a different company.</li>
-          <li>Social profiles and contact details are taken only from the verified website, and only when the profile name matches the company or its website.</li>
+          <li>Every registry fact is matched by exact organisation number, so it cannot belong to a different company.</li>
+          <li>Social profiles are taken only from the verified website, and only when the account carries the company's own name, not a parent's, a chain's or another location's.</li>
           <li>Company websites are read politely: robots.txt is respected, at most a few pages per site, and private or local network addresses are never contacted.</li>
-          <li>If a register cannot be reached, the result says so (“failed”) and shows nothing for it. Nothing is guessed or filled in.</li>
+          <li>If a source cannot be reached, the result says so (“failed”) and shows nothing for it. Nothing is guessed or filled in.</li>
           <li>Missing values are never shown as zero.</li>
           <li>Birth dates of board members and managers are not published.</li>
-          <li>Job ads come from NAV's public job feed (arbeidsplassen.no). An ad is shown only when its employer organisation number is the company or one of its registered sub-units, and only while it is active. Contact persons are never shown.</li>
-          <li>Public activity is the registry's own dated change log (for example accounts filed, address or name changed). News and procurement are not covered yet.</li>
+          <li>NAV job ads are shown only when the employer organisation number is the company or one of its registered sub-units, and only while the ad is active. A job ad from the careers page is shown only when the ad's own page is live and names this company as the employer. Contact persons are never shown.</li>
+          <li>Public activity is the registry's dated change log plus dated news posts on the company's own website. There is no press search, and public procurement is not covered.</li>
         </ul>
       </Card>
       <Card title="Run it yourself">
         <div className="space-y-3 text-sm">
-          <pre className="text-xs bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto">{`npm ci\nnpx tsx agent/run.ts <input-file> out\n\n# or a few numbers directly\nnpx tsx agent/run.ts 923609016,984851006 out`}</pre>
+          <pre className="text-xs bg-slate-900 text-slate-100 rounded-lg p-3 whitespace-pre-wrap break-words">{`npm ci\nnpx tsx agent/run.ts <input-file> out\n\n# or a few numbers directly\nnpx tsx agent/run.ts 923609016,984851006 out`}</pre>
           <dl className="grid grid-cols-[8rem_1fr] gap-y-1.5 text-sm">
             <dt className="text-slate-500">Repository</dt>
             <dd>
@@ -936,7 +1039,7 @@ function AboutView() {
               {about?.commit?.dirty ? ' (with uncommitted changes)' : ''}
             </dd>
             <dt className="text-slate-500">AI models</dt>
-            <dd>None. Only public registry and NAV job data.</dd>
+            <dd>None. Only public registry data, NAV's job feed and the company's own website.</dd>
             <dt className="text-slate-500">Third-party cost</dt>
             <dd>$0 per run</dd>
           </dl>
@@ -966,7 +1069,7 @@ function HomeView() {
     <div className="max-w-2xl mx-auto py-10 sm:py-16 space-y-6 text-center">
       <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Norwegian company facts, with the source for every one</h1>
       <p className="text-slate-600">
-        Enter an organisation number. Signalpost reads the official Brønnøysund registers and shows what it found, where it came from, and what is unknown.
+        Enter an organisation number. Signalpost reads the official Brønnøysund registers, NAV's job feed and the company's own verified website, and shows what it found, where it came from, and what is unknown.
       </p>
       <div className="flex justify-center">
         <OrgnrSearch />

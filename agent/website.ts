@@ -1175,12 +1175,18 @@ function liveAdPage(page: WebPage, requested: string, title: string | null): boo
  * ad gives one, otherwise by its legal name). Ads for the parent or a sister company, open
  * applications and expired or undated postings are not openings of this company.
  */
-function openingFor(j: JobNode, id: CompanyIdentity): boolean {
+/**
+ * A posting is an opening at this company when its employer is this company and it is current:
+ * not past its closing date, or (with no closing date) posted in the past 120 days. An ad that
+ * the employer's own live job list still carries is current whatever its age ("apply as soon as
+ * possible" ads stay open for months), so `listedLive` skips the age rule but not the others.
+ */
+function openingFor(j: JobNode, id: CompanyIdentity, opts: { listedLive?: boolean } = {}): boolean {
   if (j.title.length < 3 || j.title.length > 150 || GENERIC_LINK.test(j.title) || OPEN_APPLICATION.test(j.title)) return false;
   const today = new Date().toISOString().slice(0, 10);
   if (j.expires) {
     if (j.expires < today) return false;
-  } else if (!j.posted || Date.parse(j.posted) < Date.now() - 120 * 864e5) return false;
+  } else if (!opts.listedLive && (!j.posted || Date.parse(j.posted) < Date.now() - 120 * 864e5)) return false;
   if (j.orgIds.length) return j.orgIds.includes(id.orgnr);
   return !!j.org && sameCompanyName(j.org, id.legalName);
 }
@@ -1418,6 +1424,7 @@ export async function readSiteActivity(
       // with a script. The list's own embed script names the single ads; each is then read like
       // any other ad (it must name this company as the hiring organisation and be live).
       const jobylon = new Set<string>();
+      const onLiveList = new Set<string>(); // ads the employer's own live Jobylon list carries
       for (const a of anchorsWithPos(r.page.html, r.page.url)) {
         const m = a.url.match(/^https:\/\/emp\.jobylon\.com\/companies\/(\d+)(?:-[\w-]*)?\/?(?:[?#].*)?$/i);
         if (m) jobylon.add(m[1]);
@@ -1431,6 +1438,7 @@ export async function readSiteActivity(
         const ads = list.page.html.replace(/\\\//g, '/').matchAll(/https:\/\/emp\.jobylon\.com\/jobs\/(\d{3,})-[\w-]+\/?/gi);
         for (const m of ads) {
           const url = m[0].endsWith('/') ? m[0] : `${m[0]}/`;
+          onLiveList.add(url);
           if (!adLinks.includes(url) && !seen.has(url)) adLinks.push(url);
         }
       }
@@ -1443,7 +1451,9 @@ export async function readSiteActivity(
         if (ad.outcome !== 'ok') continue;
         const nodes = jobNodes(ad.page.html);
         if (nodes.length === 1) {
-          if (openingFor(nodes[0], id) && liveAdPage(ad.page, url, nodes[0].title)) push(nodes[0], ad.page.url, ad.page.snapshot, 'job ad linked from the careers page');
+          const listedLive = onLiveList.has(url);
+          if (openingFor(nodes[0], id, { listedLive }) && liveAdPage(ad.page, url, nodes[0].title))
+            push(nodes[0], ad.page.url, ad.page.snapshot, listedLive ? "job ad on the employer's live Jobylon list, linked from its careers page" : 'job ad linked from the careers page');
           continue;
         }
         if (nodes.length > 1) continue; // a list, not one ad

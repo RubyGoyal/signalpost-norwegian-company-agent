@@ -13,6 +13,7 @@ import {
   extractRoles,
   familyState,
   registryStatus,
+  sameRegistryEvent,
   stableStringify,
 } from './extract.ts';
 import type { NavJobIndex } from './jobs.ts';
@@ -490,10 +491,22 @@ function buildSummary(
     const show = (v: unknown): string => {
       if (v === null || v === undefined) return '';
       if (typeof v === 'number') return fmtNum(v);
+      if (typeof v === 'boolean') return v ? 'yes' : 'no';
       if (typeof v === 'object') {
         const o = v as any;
+        if (o.date && o.event) return `${o.date}: ${o.event}`; // registry event
+        if (o.date && o.title) return `${o.date} "${o.title}"`; // news post
+        if (o.title) return `"${o.title}"${o.hiring_organisation ? ` at ${o.hiring_organisation}` : ''}`; // job ad
+        if (o.text) return `${o.text}${o.date ? ` (${o.date})` : ''}`; // registry notice
+        if (o.amount !== undefined) return `${o.currency || ''} ${fmtNum(Number(o.amount))}`.trim(); // share capital
         if (o.name) return `${o.name}${o.role ? ` (${o.role})` : ''}`;
-        return o.formatted || o.url || o.description || o.code || JSON.stringify(o);
+        const named = o.formatted || o.url || o.description || o.code;
+        if (named) return String(named);
+        // Anything else: its plain values in words, never raw JSON.
+        return Object.entries(o)
+          .filter(([, x]) => x !== null && x !== undefined && typeof x !== 'object')
+          .map(([k, x]) => `${k.replace(/_/g, ' ')} ${typeof x === 'number' ? fmtNum(x) : x}`)
+          .join(', ');
       }
       return String(v);
     };
@@ -1010,7 +1023,12 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
       const old = prevByKey.get(c.key);
       if (!old) {
         changes.push({ type: 'new_value', key: c.key, family: c.family, field: c.field, previous_value: null, new_value: c.value, previous_evidence: [], evidence_ids: c.evidence_ids, previous_retrieved_at: null, detected_at: now });
-      } else if (stableStringify(old.value) !== stableStringify(c.value)) {
+      } else if (
+        stableStringify(old.value) !== stableStringify(c.value) &&
+        // A registry event is history: the same update id with the same content and a date a day
+        // apart is the feed writing its timestamp differently, not a change in the register.
+        !(c.field === 'registry_event' && sameRegistryEvent(old.value, c.value))
+      ) {
         changes.push({ type: 'changed_value', key: c.key, family: c.family, field: c.field, previous_value: old.value, new_value: c.value, previous_evidence: old.evidence_ids.map((id) => prevEv.get(id)).filter(Boolean) as Evidence[], evidence_ids: c.evidence_ids, previous_retrieved_at: old.retrieved_at, detected_at: now });
       } else unchanged++;
     }

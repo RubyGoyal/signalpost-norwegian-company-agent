@@ -211,9 +211,10 @@ async function startServer() {
       third_party_cost_usd: 0,
       sources: [
         { name: 'Enhetsregisteret (entity, roles, sub-units, update feed)', url: 'https://data.brreg.no/enhetsregisteret/api/docs/index.html', licence: 'NLOD 2.0' },
-        { name: 'Regnskapsregisteret (annual accounts)', url: 'https://data.brreg.no/regnskapsregisteret/regnskap/', licence: 'NLOD 2.0' },
+        // The API root itself returns 404, so link the official dataset page (data.norge.no).
+        { name: 'Regnskapsregisteret (annual accounts)', url: 'https://data.norge.no/en/datasets/7c87f169-2520-4e56-ba2a-b7a3cc7de2e9/regnskapsregisteret', licence: 'NLOD 2.0' },
         { name: 'NAV job vacancy feed (arbeidsplassen.no)', url: 'https://navikt.github.io/pam-stilling-feed/', licence: 'NAV API terms' },
-        { name: 'Company-owned websites (official website, linked profiles, contact links)', url: 'https://www.rfc-editor.org/rfc/rfc9309', licence: 'Public pages; robots.txt honoured' },
+        { name: 'Company-owned websites (official website, linked profiles, contact links, news, careers pages)', url: 'https://www.rfc-editor.org/rfc/rfc9309', licence: 'Public pages; robots.txt honoured' },
       ],
     });
   });

@@ -216,9 +216,30 @@ const updates: Record<string, unknown> = {
           organisasjonsnummer: A,
           endringer: [{ op: 'replace', path: '/sisteInnsendteAarsregnskap', value: '2025' }],
         },
+        // A nightly update just after midnight in Norway. QA run (Equinor): on a re-check the same
+        // update came back a day later; the mutated run writes the same instant in Norwegian time.
+        {
+          dato: mutate ? '2026-07-03T00:04:38.138+02:00' : '2026-07-02T22:04:38.138Z',
+          endringstype: 'Endring',
+          oppdateringsid: 504,
+          organisasjonsnummer: A,
+          endringer: [{ op: 'replace', path: '/kapital/belop', value: 30000 }],
+        },
+        // A new event that appears only in the mutated run.
+        ...(mutate
+          ? [
+              {
+                dato: '2026-10-20T08:00:00.000Z',
+                endringstype: 'Endring',
+                oppdateringsid: 505,
+                organisasjonsnummer: A,
+                endringer: [{ op: 'replace', path: '/hjemmeside', value: 'www.alpha-test.no' }],
+              },
+            ]
+          : []),
       ],
     },
-    page: { size: 100, totalElements: 3, totalPages: 1, number: 0 },
+    page: { size: 100, totalElements: mutate ? 5 : 4, totalPages: 1, number: 0 },
   },
 };
 
@@ -523,7 +544,7 @@ Object.assign(WEB, {
     pages: {
       '/jobs/companies/4242/embed/v1/': {
         type: 'application/javascript; charset=utf-8',
-        feed: String.raw`(function(){var html = '<ul class=\"jobylon-job-list\"><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50001-sigma-personal-rekrutteringskonsulent\/\">Rekrutteringskonsulent<\/a><\/li><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50002-kunde-as-sveiser\/\">Sveiser<\/a><\/li><\/ul>';})();`,
+        feed: String.raw`(function(){var html = '<ul class=\"jobylon-job-list\"><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50001-sigma-personal-rekrutteringskonsulent\/\">Rekrutteringskonsulent<\/a><\/li><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50002-kunde-as-sveiser\/\">Sveiser<\/a><\/li><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50003-sigma-personal-selger\/\">Selger<\/a><\/li><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50004-sigma-personal-lagermedarbeider\/\">Lagermedarbeider<\/a><\/li><\/ul>';})();`,
       },
     },
   },
@@ -534,6 +555,19 @@ Object.assign(WEB, {
         'Rekrutteringskonsulent - Sigma Personal Telemark | Jobylon',
         '<h1>Rekrutteringskonsulent</h1><p>Bli med i teamet vårt i Skien.</p>',
         '<script type="application/ld+json">{"@type":"JobPosting","title":"Rekrutteringskonsulent","datePosted":"2026-10-20","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Sigma Personal Telemark AS"}}</script>'
+      ),
+      // An "apply as soon as possible" ad posted long ago, with no closing date, that the live
+      // list still carries (QA run, homely.no): an opening.
+      '/jobs/50003-sigma-personal-selger/': page(
+        'Selger - Sigma Personal Telemark | Jobylon',
+        '<h1>Selger</h1><p>Søknadsfrist: Snarest</p><a href="#apply">Søk her</a>',
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Selger","datePosted":"2024-02-28","hiringOrganization":{"@type":"Organization","name":"Sigma Personal Telemark AS"}}</script>'
+      ),
+      // Still on the list, but the ad page says it is closed: not an opening.
+      '/jobs/50004-sigma-personal-lagermedarbeider/': page(
+        'Lagermedarbeider - Sigma Personal Telemark | Jobylon',
+        '<h1>Lagermedarbeider</h1><p>Stillingen er ikke lenger ledig.</p>',
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Lagermedarbeider","datePosted":"2025-01-10","hiringOrganization":{"@type":"Organization","name":"Sigma Personal Telemark AS"}}</script>'
       ),
       // A client's job listed by the agency: not this company's own opening.
       '/jobs/50002-kunde-as-sveiser/': page(

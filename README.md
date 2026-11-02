@@ -21,6 +21,7 @@ Builderr's feedback on the latest run named three fixes and one way to go furthe
 - Two news errors were found and fixed: a web shop's product feed read as news (lappeliten.no), and a homepage card dated by the day an office reopens instead of its publish date (treteam.no).
 - Claude cross-checked a sample of 16 of these companies item by item: 49 of 52 items right. It found two more errors, both fixed: a sole proprietor's personal Instagram account published as the firm's (helleland.one), and Homely's live job ads missed because its Jobylon list is filled in by a script.
 - The same sample is being checked by hand by a person (see "Hand check" under Tests).
+- An outside QA agent tested the deployed web app end to end and found 10 issues (wording, a date shift on re-check, a citation, three older live ads, a broken link, phone layouts). All are fixed (see "QA run on the live demo" under Tests).
 
 ## What's new in version 4
 
@@ -118,7 +119,7 @@ Optional flags and environment variables:
 - **Profiles only for this exact company.** Footer links often belong to the parent group, a sister company, the web agency or the website theme. A profile is published only when its handle is the company's legal name (give or take the legal form, a country word such as "norge", or digits), or the name of the company's own verified domain (its brand, as "agropumper" on agropumper.no). A long name may drop one word in its handle, but never its place or country word, so a national body's account is not a local unit's. The domain rule is not used for a sole proprietorship (its domain is usually the owner's name, so such an account is the owner's personal profile), on a page of someone else's site, for a domain with a group word, for a country arm, region or city unit ("Certego Norge AS" on certego.no), on a site that says it is part of a group, or when another company named on the site carries the brand ("Treteam AS", "Treteam Holding AS"). A handle that adds a group word or another name ("kappagruppen", "alpha-eiendom") is left out, and so is any link whose text or icon label names a group or another company. Share buttons and personal profiles are ignored.
 - **Contacts without personal data.** Email links are taken only on the site's own domain and only for role addresses (post@, salg@, kundeservice@ and similar), never a staff member's own address. Only the site's main phone number is taken.
 - **News means real, dated posts.** A post is published only with its publish date, read from the post's own block on the news page or the homepage (never a neighbour's), its structured data (`datePublished`), or the site's own feed (RSS `pubDate`, Atom `published`): the one it declares or, when it declares none, the standard address of the common site builders (WordPress `/feed/`, Wix `/blog-feed.xml`). Feed `lastBuildDate` and `<updated>` are never used, and comment feeds, product feeds and posts on other sites are left out. Dates marked as updated or modified (`dateModified`, "Oppdatert", "Sist endret", `class="updated"`) are never used as publish dates. Menu and paging links ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"), category, tag and archive pages, product pages, and a web shop's "Nyheter" page of new products are not news.
-- **Jobs are single, live ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform, including the ads on a company's Jobylon list that its careers page links to (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title), and structured `JobPosting` data that links to its own ad and names this company. Every ad page is opened and must show a live opening: it names the job, does not say the position is closed or that there are no openings, and does not redirect back to a list. A careers page that says there are no open positions gives no openings at all. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications, and expired or undated postings (or postings without an end date that are more than 120 days old) are left out.
+- **Jobs are single, live ads for this company.** A careers landing page is not a job. Openings come only from single ads: NAV ads matched by organisation number, ads on the company's career site at a recruiting platform, including the ads on a company's Jobylon list that its careers page links to (each ad is read and must name this company as the hiring organisation, in its structured data or, where there is none, in the ad's own title), and structured `JobPosting` data that links to its own ad and names this company. Every ad page is opened and must show a live opening: it names the job, does not say the position is closed or that there are no openings, and does not redirect back to a list. A careers page that says there are no open positions gives no openings at all. Search links (NAV, FINN), list pages, the parent's or a sister company's vacancies, open applications, and expired or undated postings are left out. A posting without an end date that is more than 120 days old is left out too, unless the employer's own live job list (Jobylon) still carries it: "apply as soon as possible" ads stay open for months.
 - **No press search.** News comes only from the company's own verified website. A search of news media by company name was tested: the only free news search that runs without a key (GDELT) found nothing for Barnekreftforeningen, a well-known national charity, over six months, and the other test queries failed. Most companies in the register are small, so a name search would return little, and what it returned would include namesakes, which breaks the exact-identity rule. Paid news APIs need keys, and this agent needs none.
 - **History is not removed.** Registry events are history, so they are never reported as removed. A job ad that goes inactive is removed from the profile and recorded as a change, as NAV's terms require.
 
@@ -217,10 +218,24 @@ Details are in [`examples/live-test-v5-report.json`](examples/live-test-v5-repor
 | News | 18 | 18 | 0 | 0 |
 | Jobs | 7 | 5 | 1 | 1 |
 
-- Wrong, now fixed: a sole proprietor's private Instagram account, named after the owner like the firm's domain (only a handle with the whole business name counts for a sole proprietorship now); and Homely's live Jobylon ads, missed because a script fills in the list (the agent now reads the list's embed script, then each ad). On Homely's real ads, 3 of 6 are now published; 3 older ads without an end date are left out by the 120-day freshness rule.
+- Wrong, now fixed: a sole proprietor's private Instagram account, named after the owner like the firm's domain (only a handle with the whole business name counts for a sole proprietorship now); and Homely's live Jobylon ads, missed because a script fills in the list (the agent now reads the list's embed script, then each ad). On Homely's real ads, 3 of 6 were then published, and 3 older ads without an end date were left out by the 120-day freshness rule. The QA run below found those 3 still open, so an ad that the employer's own live list still carries is now published whatever its age.
 - Can't tell: three of a staffing agency's vacancies name no employer, so they may be its own hires or its clients'. None are published.
 
 Every verdict, with the evidence seen, is in [`examples/cross-check-v5.json`](examples/cross-check-v5.json).
+
+**QA run on the live demo (2 November 2026):** Momentic's QA agent tested the deployed web app (Render, commit `a5508d7`) as a user would, with no access to the code: look-ups in every written form, three full profiles (Equinor, Flexiform, Homely) checked against their sources, one registry re-check each, batch filters, export and compare, the How it works page, direct links, Back and Forward, keyboard use and a 375 px phone screen. Look-up, batch results and direct navigation passed. It found 10 issues, all now fixed with offline tests where the agent was involved:
+
+| Issue found | Fix |
+|---|---|
+| The Hiring tile showed an internal code ("checked nav no active ads last 60 days") | Every reason is shown in plain words ("Checked: no active NAV job ads (last 60 days)") |
+| A re-check moved twelve Equinor registry events one day later and listed them as changes | The registry's nightly updates land just after midnight Norwegian time. Each event is now dated by its UTC day however the feed writes the time (Z, an offset or local time), and an event with the same update id and content is never reported as changed for a one-day difference |
+| The summary's change list printed raw JSON | Every change is written in words ("new registry event: 2026-10-20: website changed: …") |
+| The at-a-glance line cited only Enhetsregisteret for the revenue figure | The app now links every distinct source behind a sentence (here Enhetsregisteret, Regnskapsregisteret, the company website and NAV); the envelope already cited the accounts |
+| Homely: 3 of the 6 ads on its live Jobylon list were left out | They were older than 120 days with no end date, yet still open. An ad the employer's own live list carries is now an opening whatever its age; its own page must still be live |
+| The Regnskapsregisteret link on How it works returned 404 | Links the official dataset page on data.norge.no |
+| Phone: the run command, the sources table and the compare table needed sideways scrolling | The command wraps, sources are listed one per block, and compare lists every company under each fact |
+
+It also noted that a filter matching nothing showed an empty table (it now says so, with a button to clear the filters), and that the How it works page still described version 4 (now updated). The full list, with what was verified and what it could not check (NAV absence, social accounts behind a login), is in [`examples/qa-run-v5.json`](examples/qa-run-v5.json).
 
 To smoke-test against the live registry on a random sample of real companies:
 
@@ -229,7 +244,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (140 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (146 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -247,7 +262,8 @@ The offline self-test (140 checks) runs against simulated registry, NAV and comp
 - live openings only (Builderr's feedback on the latest run): a careers page saying "ingen ledige stillinger" with old job data, an ad page saying there is nothing open, an ad redirecting to the list; an open-application line next to real ads does not hide them
 - profiles for this exact company: a group's bare-brand account for a country arm, a national body's account for a local unit, brand accounts on a site that says it is part of a group, a link labelled as the group's
 - more news from the company's own site: a dated post on the homepage, an undeclared WordPress feed; a shop's product feed and a card whose date disagrees with the date in its own address are not news
-- summary: the at-a-glance line, including the revenue trend, and the "What's new" line (order, evidence, the empty case, changes on a re-run)
+- summary: the at-a-glance line, including the revenue trend, and the "What's new" line (order, evidence, the empty case, changes on a re-run); the change list in words, never raw JSON
+- the QA run's cases: a registry update written with a Norwegian time offset keeps its day and is not a change; an old ad on the employer's live Jobylon list is an opening, and one whose page says it is closed is not
 - run report: the quality section passes on every fixture and catches a claim with missing evidence or website facts without a verified website
 - input formats, unfamiliar column or key names, and malformed numbers
 

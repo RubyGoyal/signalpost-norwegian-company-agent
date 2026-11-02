@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { sameRegistryEvent, utcDay } from '../extract.ts';
 import { parseInputText } from '../input.ts';
 import { qualityReport } from '../quality.ts';
 import { checkUrlShape, isPublicAddress, parseRobots, robotsAllows } from '../web.ts';
@@ -35,6 +36,24 @@ function run(outName: string, env: Record<string, string> = {}, extra: string[] 
 
 const by = (envs: Envelope[], o: string) => envs.find((e) => e.organisation_number === o)!;
 
+// --- Registry timestamps ------------------------------------------------------
+check(
+  utcDay('2026-10-13T22:04:38.138Z') === '2026-10-13' &&
+    utcDay('2026-10-14T00:04:38.138+02:00') === '2026-10-13' &&
+    utcDay('2026-01-14T00:30:00+0100') === '2026-01-13' &&
+    utcDay('2026-10-14T00:04:38.138') === '2026-10-13' &&
+    utcDay('2026-01-14T00:30:00') === '2026-01-13' &&
+    utcDay('2026-08-18T18:00:17.195Z') === '2026-08-18' &&
+    utcDay('2026-08-18') === '2026-08-18',
+  'registry timestamps: the same instant gets the same UTC day however the feed writes it (Z, an offset, or Norwegian local time)'
+);
+check(
+  sameRegistryEvent({ date: '2026-10-13', event: 'employee count updated: 21231', change_type: 'Endring', fields: ['employee count updated'] }, { date: '2026-10-14', event: 'employee count updated: 21231', change_type: 'Endring', fields: ['employee count updated'] }) &&
+    !sameRegistryEvent({ date: '2026-10-13', event: 'employee count updated: 21231', change_type: 'Endring', fields: [] }, { date: '2026-10-13', event: 'employee count updated: 21300', change_type: 'Endring', fields: [] }) &&
+    !sameRegistryEvent({ date: '2026-10-10', event: 'x', change_type: 'Endring', fields: [] }, { date: '2026-10-13', event: 'x', change_type: 'Endring', fields: [] }),
+  'registry events: a one-day date difference with the same content is the same event; a different value or a bigger gap is not'
+);
+
 // --- Run 1: cold start --------------------------------------------------------
 const r1 = run('run1');
 check(r1.length === 7, `one envelope per unique input (got ${r1.length}, expected 7)`);
@@ -60,7 +79,8 @@ check(fieldsA('email')[0]?.value === 'post@alpha-test.no' && A1.availability.con
 const G1 = by(r1, '910000721');
 check(G1.state === 'available' && !G1.claims.some((c) => c.family === 'contact_points'), 'G (ENK): personal contact details NOT published');
 const ev1 = fieldsA('registry_event').map((c) => (c.value as any).event);
-check(A1.availability.public_activity.state === 'available' && ev1.length === 2, `A: 2 dated registry events published (got ${ev1.length})`);
+check(A1.availability.public_activity.state === 'available' && ev1.length === 3, `A: 3 dated registry events published (got ${ev1.length})`);
+check((fieldsA('registry_event').find((c) => c.key.endsWith('#504'))?.value as any)?.date === '2026-07-02', 'A: a registry event dated by its UTC day (an update at 00:04 Norwegian time is filed the day before)');
 check(ev1.some((t) => t.includes('annual accounts filed: 2025')) && ev1.some((t) => t.includes('employee count updated: 42')), 'A: events describe what changed');
 check(!ev1.some((t) => /registreringsdato/.test(t)), 'A: bookkeeping-only changes and empty "Ukjent" events skipped');
 check(!B1.claims.some((c) => c.field === 'registry_event') && B1.availability.public_activity.state === 'available' && B1.claims.every((c) => c.field !== 'site_news' || c.evidence_ids.length === 1), 'B: no registry events; its public activity is the dated post from its own feed');
@@ -108,6 +128,10 @@ check(rev?.type === 'changed_value' && rev.previous_value === 58_000_000 && rev.
 check((rev?.previous_evidence.length || 0) > 0, 'A: change keeps the previous evidence');
 check(A3.refresh.changes.some((c) => c.type === 'removed_value' && (c.previous_value as any)?.name === 'Ola Testmann') && A3.refresh.changes.some((c) => c.type === 'new_value' && (c.new_value as any)?.name === 'Kari Testesen'), 'A: CEO replacement shows old removed and new added');
 check(A3.summary.text.includes('Changes since'), 'A: summary reports what changed');
+const ev504 = A3.claims.find((c) => c.key.endsWith('registry_event#504'));
+check((ev504?.value as any)?.date === '2026-07-02' && !A3.refresh.changes.some((c) => c.key.endsWith('registry_event#504')), `QA run (Equinor): the same registry update written with a Norwegian time offset keeps its day and is not reported as a change (got ${(ev504?.value as any)?.date})`);
+const changesLine = A3.summary.statements.find((s) => s.text.startsWith('Changes since'))?.text || '';
+check(changesLine.includes('new registry event: 2026-10-20: website changed: www.alpha-test.no') && !/[{}]|"date"|change_type/.test(changesLine), `QA run (Equinor): the summary's change list is written in words, never raw JSON (got ${changesLine.slice(0, 300)})`);
 
 // --- Run 4: roles source down → no false removals -----------------------------
 const A4 = by(run('run4', { MOCK_MUTATE: '1', MOCK_FAIL_ROLES: '1' }), '910000063');
@@ -161,7 +185,7 @@ const wrun = (name: string, env: Record<string, string> = {}) => {
 };
 const w1 = wrun('web1');
 const wq = JSON.parse(readFileSync(path.join(work, 'web1', 'run-report.json'), 'utf8')).quality;
-check(wq.all_checks_passed === true && wq.from_company_websites.dated_news_posts_from_feeds >= 2 && wq.from_company_websites.job_ads === 5 && wq.websites.not_published_by_reason['not_available:registered_website_belongs_to_another_entity'] === 1 && wq.websites.published_by_how_verified.registered_and_verified_on_site >= 1, `run report: quality section counts website results and passes on the website fixtures (got ${JSON.stringify(wq).slice(0, 400)})`);
+check(wq.all_checks_passed === true && wq.from_company_websites.dated_news_posts_from_feeds >= 2 && wq.from_company_websites.job_ads === 6 && wq.websites.not_published_by_reason['not_available:registered_website_belongs_to_another_entity'] === 1 && wq.websites.published_by_how_verified.registered_and_verified_on_site >= 1, `run report: quality section counts website results and passes on the website fixtures (got ${JSON.stringify(wq).slice(0, 400)})`);
 const wa = (o: string) => by(w1, o).availability;
 const wc = (o: string, f: string) => by(w1, o).claims.filter((c) => c.field === f);
 const aSite = wc('910000063', 'website')[0];
@@ -232,7 +256,8 @@ check(wa('910001019').official_website.state === 'available' && wc('910001019', 
 check(wc('910000977', 'website')[0]?.confidence === 0.8 && wa('910000977').official_website.state === 'available' && wa('910000985').official_website.state === 'blocked' && !wc('910000985', 'website').length, 'audit: a registered site behind bot protection is kept only when its domain carries the company name');
 check(!wc('910000896', 'site_news').length && wa('910000896').official_website.state === 'available', 'audit: a web shop\'s "Nyheter" (new products) is not read as news');
 check(wc('910000993', 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).join('|') === '2026-09-12 Nytt kontor i Arendal', `news (Builderr feedback): a dated post shown on the homepage is read when the site has no news page; an undated card, a service page and a card whose date disagrees with the date in its own address (live check: treteam.no) are not (got ${wc('910000993', 'site_news').map((c) => (c.value as any).title).join('|')})`);
-check(wc('910000993', 'site_job').map((c) => `${(c.value as any).title} | ${(c.value as any).url}`).join() === 'Rekrutteringskonsulent | https://emp.jobylon.com/jobs/50001-sigma-personal-rekrutteringskonsulent/' && by(w1, '910000993').evidence.some((e) => e.source_url.startsWith('https://emp.jobylon.com/jobs/50001')), `jobs (hand check: homely.no): single ads behind a careers page's link to the company's Jobylon list are read through the list's embed script; a client's ad on the list is left out (got ${wc('910000993', 'site_job').map((c) => (c.value as any).title).join('|')})`);
+check(wc('910000993', 'site_job').map((c) => `${(c.value as any).title} | ${(c.value as any).url}`).sort().join() === 'Rekrutteringskonsulent | https://emp.jobylon.com/jobs/50001-sigma-personal-rekrutteringskonsulent/,Selger | https://emp.jobylon.com/jobs/50003-sigma-personal-selger/' && by(w1, '910000993').evidence.some((e) => e.source_url.startsWith('https://emp.jobylon.com/jobs/50001')), `jobs (hand check: homely.no): single ads behind a careers page's link to the company's Jobylon list are read through the list's embed script; a client's ad on the list is left out (got ${wc('910000993', 'site_job').map((c) => (c.value as any).title).join('|')})`);
+check(wc('910000993', 'site_job').some((c) => (c.value as any).title === 'Selger' && (c.value as any).posted === '2024-02-28') && !wc('910000993', 'site_job').some((c) => (c.value as any).title === 'Lagermedarbeider'), "jobs (QA run, homely.no): an old \"apply as soon as possible\" ad that the employer's live Jobylon list still carries is an opening; one whose page says it is closed is not");
 check(wc('910001000', 'site_news').map((c) => (c.value as any).title).join() === 'Ny utstilling i Skien' && by(w1, '910001000').evidence.some((e) => e.source_url === 'https://www.idehuset.no/feed/'), 'news (Builderr feedback): a feed the site does not declare is read at the standard WordPress address');
 const aW3 = by(w3, '910000063');
 check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news'), 'website down: no false removals of site news or job ads');
