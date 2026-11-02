@@ -239,6 +239,8 @@ Every verdict, with the evidence seen, is in [`examples/cross-check-v5.json`](ex
 
 The first run also noted that a filter matching nothing showed an empty table (it now says so, with a button to clear the filters), and that the How it works page still described version 4 (now updated). The full list, with what was verified and what it could not check (NAV absence, social accounts behind a login), is in [`examples/qa-run-v5.json`](examples/qa-run-v5.json).
 
+**Full live run on GitHub:** the repository's Actions tab has a "Full live run" workflow, started by hand. On GitHub's servers it installs with `npm ci`, runs the offline checks, runs the official command on real companies (by default the 1,000 in `examples/smoke-1000.txt`), runs it again to check that an immediate re-run reports no false changes, and saves the envelopes, run reports and logs for download. The run's page shows a summary: states, runtime, requests, quality checks, coverage by kind of fact, and what came from company websites. `npx tsx scripts/run-summary.ts out` prints the same summary for any local run.
+
 To smoke-test against the live registry on a random sample of real companies:
 
 ```bash

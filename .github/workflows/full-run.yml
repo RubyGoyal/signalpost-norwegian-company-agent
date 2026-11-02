@@ -1,0 +1,74 @@
+# Full live run of the official command on GitHub's servers, started by hand from the Actions tab.
+# It installs with `npm ci`, runs the offline checks, then runs
+#   npx tsx agent/run.ts <input-file> out
+# on real companies (default: the 1,000 drawn from Builderr's company list), runs it again to
+# check that an immediate re-run reports no false changes, and saves the output for download.
+name: Full live run
+
+on:
+  workflow_dispatch:
+    inputs:
+      input_file:
+        description: File of organisation numbers in the repository
+        default: examples/smoke-1000.txt
+        required: true
+      rerun:
+        description: Run a second time to check refresh (no false changes)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      INPUT_FILE: ${{ inputs.input_file }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Install (npm ci)
+        run: npm ci
+
+      - name: Offline checks
+        run: npm run -s check:signalpost
+
+      - name: Run the agent (official command)
+        run: |
+          mkdir -p logs
+          npx tsx agent/run.ts "$INPUT_FILE" out 2> logs/run-1-progress.log | tee logs/run-1-stdout.json
+          tail -n 5 logs/run-1-progress.log
+
+      - name: Run it again on the same input (refresh check)
+        if: ${{ inputs.rerun }}
+        run: |
+          npx tsx agent/run.ts "$INPUT_FILE" out-rerun --run-id rerun 2> logs/run-2-progress.log | tee logs/run-2-stdout.json
+          tail -n 5 logs/run-2-progress.log
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          if [ -f out/run-report.json ]; then
+            npx tsx scripts/run-summary.ts out out-rerun | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No run report was written." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Save the output
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: signalpost-full-run-${{ github.sha }}
+          path: |
+            out/
+            out-rerun/
+            logs/
+          if-no-files-found: warn
+          retention-days: 30
