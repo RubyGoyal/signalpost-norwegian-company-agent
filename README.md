@@ -21,7 +21,7 @@ Builderr's feedback on the latest run named three fixes and one way to go furthe
 - Two news errors were found and fixed: a web shop's product feed read as news (lappeliten.no), and a homepage card dated by the day an office reopens instead of its publish date (treteam.no).
 - Claude cross-checked a sample of 16 of these companies item by item: 49 of 52 items right. It found two more errors, both fixed: a sole proprietor's personal Instagram account published as the firm's (helleland.one), and Homely's live job ads missed because its Jobylon list is filled in by a script.
 - The same sample is being checked by hand by a person (see "Hand check" under Tests).
-- An outside QA agent tested the deployed web app end to end and found 10 issues (wording, a date shift on re-check, a citation, three older live ads, a broken link, phone layouts). All are fixed (see "QA run on the live demo" under Tests).
+- An outside QA agent tested the deployed web app end to end and found 10 issues (wording, a date shift on re-check, a citation, three older live ads, a broken link, phone layouts). All are fixed, and a second run on the fixed version confirmed 9 of them live; the tenth shows only when a source changes and is covered by an offline test (see "QA run on the live demo" under Tests).
 
 ## What's new in version 4
 
@@ -235,7 +235,9 @@ Every verdict, with the evidence seen, is in [`examples/cross-check-v5.json`](ex
 | The Regnskapsregisteret link on How it works returned 404 | Links the official dataset page on data.norge.no |
 | Phone: the run command, the sources table and the compare table needed sideways scrolling | The command wraps, sources are listed one per block, and compare lists every company under each fact |
 
-It also noted that a filter matching nothing showed an empty table (it now says so, with a button to clear the filters), and that the How it works page still described version 4 (now updated). The full list, with what was verified and what it could not check (NAV absence, social accounts behind a login), is in [`examples/qa-run-v5.json`](examples/qa-run-v5.json).
+**Re-run on the fixed version (2 November 2026, commit `13bfedd`):** the same agent confirmed 9 of the 10 fixes on the live demo, with no new issues: plain hiring wording, Equinor's registry dates unchanged after a re-check (181 facts re-confirmed, no changes), the accounts cited for revenue, all 6 of Homely's live ads, a working accounts link, and the three phone layouts (compare also with three companies). The tenth, the change list in words, appears only when a source has changed, and nothing had changed between the two runs; the offline self-test covers it.
+
+The first run also noted that a filter matching nothing showed an empty table (it now says so, with a button to clear the filters), and that the How it works page still described version 4 (now updated). The full list, with what was verified and what it could not check (NAV absence, social accounts behind a login), is in [`examples/qa-run-v5.json`](examples/qa-run-v5.json).
 
 To smoke-test against the live registry on a random sample of real companies:
 
