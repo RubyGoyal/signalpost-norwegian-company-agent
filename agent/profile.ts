@@ -760,7 +760,7 @@ export async function gatherCompany(rawOrgnr: string, inputIndex: number, ctx: R
     const id = identityFrom(orgnr, ent.json);
     const webTask = (async () => {
       try {
-        g.website = await findWebsite(ctx.web, id, ctx.websiteBudgetMs ?? 20_000, since);
+        g.website = await findWebsite(ctx.web, id, ctx.websiteBudgetMs ?? 30_000, since);
       } catch (e: any) {
         g.website = { state: 'incomplete', verdicts: [], verified: null, registryVerdict: null };
         g.errors.push({ source: 'company_website', code: 'website_step_error', message: String(e?.message || e) });
@@ -1010,7 +1010,8 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
   const families = (c: Claim) => availability[c.family]?.state;
   // Contact links read from the company website are only re-checked when the site was verified again.
   const siteVerified = !!g.website?.verified;
-  const careersChecked = !!g.website?.activity?.careersChecked;
+  // Careers-page openings are re-checked only when the careers page and every ad it leads to were read.
+  const careersChecked = !!g.website?.activity?.careersChecked && g.website?.activity?.jobsComplete !== false;
   // A website published last time is reported as removed only when this run settled that it is not
   // the company's own (a group's, another company's, parked) or the register stopped listing it. A
   // site that did not answer this time (unreachable, refused, not reached in the time budget) is

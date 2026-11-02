@@ -1001,6 +1001,12 @@ export interface SiteActivity {
   /** The careers page says there are no open positions: no openings are taken from the site. */
   careersPageSaysNoOpenings?: boolean;
   careersChecked: boolean;
+  /**
+   * Every job ad the careers page leads to was read. False when a job list or an ad page could not
+   * be read, or the time budget or ad-page cap cut the reading short: the openings found are real,
+   * but an ad missing from them is not evidence that it closed.
+   */
+  jobsComplete?: boolean;
   jobs: SiteJob[];
   snapshots: SourceSnapshot[];
 }
@@ -1380,6 +1386,8 @@ export async function readSiteActivity(
     if (r.outcome === 'ok') {
       act.careersChecked = true;
       act.careersPage = r.page.url;
+      act.jobsComplete = true;
+      const cutShort = () => (act.jobsComplete = false);
       const seen = new Set<string>();
       const push = (j: JobNode, url: string, snapshot: SourceSnapshot, via: string) => {
         if (seen.has(url)) return;
@@ -1397,7 +1405,11 @@ export async function readSiteActivity(
       //    The careers page itself is a landing page, not a job.
       const landing = r.page.url.replace(/[?#].*$/, '').replace(/\/$/, '');
       for (const j of jobNodes(r.page.html)) {
-        if (!j.url || !openingFor(j, id) || adReads >= MAX_AD_PAGES || signal?.aborted) continue;
+        if (!j.url || !openingFor(j, id)) continue;
+        if (adReads >= MAX_AD_PAGES || signal?.aborted) {
+          cutShort();
+          continue;
+        }
         let u: URL;
         try {
           u = new URL(j.url, r.page.url);
@@ -1412,6 +1424,7 @@ export async function readSiteActivity(
         if (seen.has(u.href)) continue;
         const ad = await web.getPage(u.href, `${snapPrefix}:job:${adReads++}`, signal);
         act.snapshots.push(ad.outcome === 'ok' ? ad.page.snapshot : ad.snapshot);
+        if (ad.outcome !== 'ok' && ad.outcome !== 'not_found') cutShort();
         if (ad.outcome !== 'ok' || !liveAdPage(ad.page, u.href, j.title)) continue;
         push(j, ad.page.url, ad.page.snapshot, 'job ad on its own page, listed in the careers page data');
       }
@@ -1438,9 +1451,15 @@ export async function readSiteActivity(
       }
       for (const m of r.page.html.matchAll(/https:\/\/cdn\.jobylon\.com\/jobs\/companies\/(\d+)\/embed/gi)) jobylon.add(m[1]);
       for (const cid of [...jobylon].slice(0, 2)) {
-        if (signal?.aborted) break;
+        if (signal?.aborted) {
+          cutShort();
+          break;
+        }
         const list = await web.getPage(`https://cdn.jobylon.com/jobs/companies/${cid}/embed/v1/?page_size=20`, `${snapPrefix}:joblist:${cid}`, signal, 'script');
-        if (list.outcome !== 'ok') continue;
+        if (list.outcome !== 'ok') {
+          cutShort();
+          continue;
+        }
         act.snapshots.push(list.page.snapshot);
         const ads = list.page.html.replace(/\\\//g, '/').matchAll(/https:\/\/emp\.jobylon\.com\/jobs\/(\d{3,})-[\w-]+\/?/gi);
         for (const m of ads) {
@@ -1450,11 +1469,15 @@ export async function readSiteActivity(
         }
       }
       for (const url of adLinks) {
-        if (signal?.aborted || adReads >= MAX_AD_PAGES) break;
+        if (signal?.aborted || adReads >= MAX_AD_PAGES) {
+          cutShort();
+          break;
+        }
         const ad = await web.getPage(url, `${snapPrefix}:job:${adReads++}`, signal);
         const snap = ad.outcome === 'ok' ? ad.page.snapshot : ad.snapshot;
         snap.publisher = `The company (its job ad on ${new URL(url).hostname}, linked from its careers page)`;
         act.snapshots.push(snap);
+        if (ad.outcome !== 'ok' && ad.outcome !== 'not_found') cutShort();
         if (ad.outcome !== 'ok') continue;
         const nodes = jobNodes(ad.page.html);
         if (nodes.length === 1) {
@@ -1500,7 +1523,7 @@ export interface WebsiteOutcome {
   activity?: SiteActivity;
 }
 
-export async function findWebsite(web: WebClient | null | undefined, id: CompanyIdentity, budgetMs = 20_000, since = '2025-01-01'): Promise<WebsiteOutcome> {
+export async function findWebsite(web: WebClient | null | undefined, id: CompanyIdentity, budgetMs = 30_000, since = '2025-01-01'): Promise<WebsiteOutcome> {
   if (!web || web.disabled) return { state: 'disabled', verdicts: [], verified: null, registryVerdict: null, disabledReason: web?.disabledReason || 'website_step_disabled' };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), budgetMs);

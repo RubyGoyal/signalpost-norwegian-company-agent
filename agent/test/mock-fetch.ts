@@ -7,6 +7,7 @@
 //   MOCK_AD_INACTIVE=1 → company A's job ad has gone inactive (refresh removal test)
 //   MOCK_SITE_DOWN=1   → company A's website does not answer (no false removals test)
 //   MOCK_SITE_GONE=1   → two verified sites refuse connections (a guessed one and a registered one)
+//   MOCK_JOBLIST_DOWN=1 → the Jobylon job list times out
 //   MOCK_NO_WEB=1      → no DNS at all: the public web is unreachable (website step not run)
 // Company websites are served from the WEB table below, with a fake DNS (globalThis.__SIGNALPOST_DNS__).
 
@@ -44,6 +45,7 @@ const navDown = env.MOCK_NAV_DOWN === '1';
 const adInactive = env.MOCK_AD_INACTIVE === '1';
 const siteDown = env.MOCK_SITE_DOWN === '1';
 const siteGone = env.MOCK_SITE_GONE === '1';
+const jobListDown = env.MOCK_JOBLIST_DOWN === '1';
 const noWeb = env.MOCK_NO_WEB === '1';
 
 const json = (status: number, body: unknown) =>
@@ -632,6 +634,8 @@ const html = (body: string) => new Response(body, { status: 200, headers: { 'con
 function webResponse(url: URL): Response {
   const host = url.hostname;
   if (siteDown && host.endsWith('alpha-test.no')) throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  // Live run on 1,000 companies: a job list that answered on the first run times out on the re-run.
+  if (jobListDown && host === 'cdn.jobylon.com') throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
   // Live run on 1,000 companies: a site that answered yesterday refuses connections today.
   if (siteGone && (host.endsWith('testselskap-beta.no') || host === 'www.idehuset.no')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
   // A mail-only domain: it resolves, but no web server answers.

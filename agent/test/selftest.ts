@@ -225,6 +225,10 @@ check(
   `live run on 1,000 companies: a verified site that does not answer on a re-run is not published, and is not reported as removed (got ${goneChanges.map((c) => c.field).join(',')})`
 );
 const w7 = wrun('web7');
+const w8 = wrun('web8', { MOCK_JOBLIST_DOWN: '1' });
+check(!by(w8, '910000993').refresh.changes.some((c) => c.field === 'site_job'), `live run on 1,000 companies: when the job list cannot be read on a re-run, its openings are not reported as closed (got ${by(w8, '910000993').refresh.changes.map((c) => c.type + ' ' + c.field).join(', ')})`);
+const w9 = wrun('web9');
+check(by(w9, '910000993').refresh.changes.length === 0 && wc('910000993', 'site_job').length === by(w9, '910000993').claims.filter((c) => c.field === 'site_job').length, 'live run on 1,000 companies: when the job list answers again, the same openings are back with no change reported');
 check(['910000098', '910001000'].every((o) => by(w7, o).refresh.changes.length === 0 && by(w7, o).claims.some((c) => c.field === 'website') && by(w7, o).claims.some((c) => c.field === 'site_news')), `live run on 1,000 companies: when that site answers again, it and its news are back with no change reported in either direction (got ${['910000098', '910001000'].flatMap((o) => by(w7, o).refresh.changes.map((c) => c.type + ' ' + c.field)).join(', ')})`);
 
 // --- Site news, careers page and the at-a-glance summary ---------------------------------

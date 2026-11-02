@@ -73,7 +73,7 @@ async function main() {
     ? new WebClient({ concurrency: Number(process.env.SIGNALPOST_WEB_CONCURRENCY || 24), timeoutMs: 8_000, maxBytes: 1_500_000, maxRedirects: 4, maxRequests: Number(process.env.SIGNALPOST_WEB_MAX_REQUESTS || 25000) })
     : null;
   ctx.web = web;
-  ctx.websiteBudgetMs = Number(process.env.SIGNALPOST_WEBSITE_BUDGET_MS || 20_000);
+  ctx.websiteBudgetMs = Number(process.env.SIGNALPOST_WEBSITE_BUDGET_MS || 30_000);
   if (web) {
     const ok = await web.probe();
     process.stderr.write(`signalpost: company websites ${ok ? 'reachable' : `not reachable (${web.disabledReason}); website step reported as not run`}\n`);

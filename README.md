@@ -1,6 +1,6 @@
-# Signalpost — Norwegian company profiles with evidence
+# Signalpost: Norwegian company profiles with evidence
 
-Signalpost takes Norwegian organisation numbers and returns one result envelope per company. Each envelope holds the facts that the official Brønnøysund registers hold for that exact organisation number, the company's verified official website and the profiles it links to, and its active job ads on NAV. Every fact carries its source URL, where in the source it was found, the retrieval time, and the reporting period where one applies.
+Signalpost takes Norwegian organisation numbers and returns one result envelope per company. Each envelope holds the facts that the official Brønnøysund registers hold for that exact organisation number, the company's verified official website with the profiles it links to and its dated news posts, and its live job ads on NAV and on its own careers page. Every fact carries its source URL, where in the source it was found, the retrieval time, and the reporting period where one applies.
 
 Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/signalpost).
 
@@ -68,7 +68,7 @@ Optional flags and environment variables:
 | `--jobs` | `SIGNALPOST_JOBS` | on | `off` skips the NAV job feed |
 | `--jobs-days` | `SIGNALPOST_JOBS_DAYS` | 60 | How many days of NAV job feed to read |
 | `--web` | `SIGNALPOST_WEB` | on | `off` skips the company-website step (reported as not checked) |
-| | `SIGNALPOST_WEBSITE_BUDGET_MS` | 20000 | Time budget for one company's website step |
+| | `SIGNALPOST_WEBSITE_BUDGET_MS` | 30000 | Time budget for one company's website step |
 | | `SIGNALPOST_JOBS_DETAIL_BUDGET_MS` | 300000 | Time budget for reading every active NAV ad |
 
 ## What each envelope contains
@@ -107,7 +107,7 @@ Optional flags and environment variables:
 - **Exact identity.** Every Brønnøysund register is queried by the exact organisation number, after a modulus-11 check, so facts cannot attach to a namesake, parent or subsidiary. NAV job ads and websites are attached only after their own evidence confirms the organisation number or the exact company (see below).
 - **No invented values.** A value is published only if the register holds it. If a register cannot be reached after retries, that family is `failed` and has no claims. If the identity lookup fails, the company is `failed` with zero claims.
 - **Missing is not zero.** An employee count is published only when the register says one is registered. Accounts figures are published only when present in the filing, and always with their reporting period.
-- **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage, an unreachable website or a skipped step never shows up as removed facts. A website published before that does not answer on a re-run is not published that day and is not reported as removed; it is reported only when a check shows the site is no longer the company's own or the register stops listing it. Its news posts are kept too, so they do not come back as "new" when the site answers again.
+- **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage, an unreachable website or a skipped step never shows up as removed facts. A website published before that does not answer on a re-run is not published that day and is not reported as removed; it is reported only when a check shows the site is no longer the company's own or the register stops listing it. Its news posts are kept too, so they do not come back as "new" when the site answers again. Job ads from a careers page are reported as closed only when the careers page and every ad it leads to were read; if a job list or an ad could not be read, or the time budget ran out, the earlier openings are kept as they were.
 - **Personal data minimisation.** Role holders' names are published (they are public register data). Birth dates are not. Job ad contact persons are never published, and contact details of sole proprietorships are left out.
 - **Hiring by organisation number.** Every active NAV ad's detail record is read once per run and indexed by the employer's organisation number, so an ad posted under a brand name is still found and a namesake employer never matches. If that read cannot finish in its time budget, the remaining ads are picked by employer name and still confirmed by organisation number.
 - **A website is a claim only after proof, even when the registry lists it.** Candidate sites (registered website, registered email domain, domains spelled from the legal name) are only guesses. A site is published as the company's own when it shows the company's organisation number, or when it carries the company's exact name and (for name-spelled domains) also the registered phone number or street address. Registries often list a parent group's, chain's or brand's site, so a registered website is not published when:
@@ -248,7 +248,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (149 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (151 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -268,7 +268,7 @@ The offline self-test (149 checks) runs against simulated registry, NAV and comp
 - more news from the company's own site: a dated post on the homepage, an undeclared WordPress feed; a shop's product feed and a card whose date disagrees with the date in its own address are not news
 - summary: the at-a-glance line, including the revenue trend, and the "What's new" line (order, evidence, the empty case, changes on a re-run); the change list in words, never raw JSON
 - the QA run's cases: a registry update written with a Norwegian time offset keeps its day and is not a change; an old ad on the employer's live Jobylon list is an opening, and one whose page says it is closed is not
-- the full live run's cases: a new site's "Hei, verden!" sample post is not news; a verified site that stops answering on a re-run is not reported as removed, and when it answers again neither it nor its news shows up as new
+- the full live run's cases: a new site's "Hei, verden!" sample post is not news; a verified site that stops answering on a re-run is not reported as removed, and when it answers again neither it nor its news shows up as new; a job list that cannot be read on a re-run does not close its openings
 - run report: the quality section passes on every fixture and catches a claim with missing evidence or website facts without a verified website
 - input formats, unfamiliar column or key names, and malformed numbers
 
