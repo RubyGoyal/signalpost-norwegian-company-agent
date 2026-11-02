@@ -312,8 +312,10 @@ function SourceLinks({ ids, evidence, snapshots }: { ids: string[]; evidence: Ma
 
 function OrgnrSearch({ compact = false, initial = '' }: { compact?: boolean; initial?: string }) {
   const [value, setValue] = useState(initial);
-  const check = validateOrgnr(value);
-  const showError = value.replace(/\s/g, '').length >= 9 && !check.valid;
+  // Accept the same written forms as the batch input: "923 609 016", "923.609.016", "NO923609016MVA".
+  const digitsOnly = value.trim().replace(/^NO/i, '').replace(/MVA$/i, '').replace(/[\s.\-]/g, '');
+  const check = validateOrgnr(digitsOnly);
+  const showError = digitsOnly.length >= 9 && !check.valid;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (check.valid) go(`#/company/${check.normalized}`);
