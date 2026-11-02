@@ -261,6 +261,10 @@ npm run dev        # http://localhost:3000
 - **Batch results:** browse `out/envelopes.jsonl` with filters, export, and side-by-side compare of up to three companies.
 - **How it works:** sources, rules and the current commit.
 
+## License
+
+The code is released under the [MIT License](LICENSE). The data the agent collects keeps its own terms: the Brønnøysund registers under [NLOD 2.0](https://data.norge.no/nlod/en/2.0), NAV job ads under the [NAV API terms](https://arbeidsplassen.nav.no/vilkar-api), and company websites as their owners publish them (see "Sources, rights and outbound policy").
+
 ## Project layout
 
 ```

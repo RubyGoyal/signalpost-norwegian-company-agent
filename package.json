@@ -1,6 +1,7 @@
 {
   "name": "signalpost-norwegian-company-agent",
   "private": true,
+  "license": "MIT",
   "version": "1.0.0",
   "type": "module",
   "engines": {
