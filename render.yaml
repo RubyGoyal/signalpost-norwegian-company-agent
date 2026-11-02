@@ -1,0 +1,16 @@
+# One-click deploy of the Signalpost web app on Render's free plan:
+# https://render.com/deploy?repo=https://github.com/RubyGoyal/signalpost-norwegian-company-agent
+# The build also runs the agent on the 10 sample companies, so the Batch results page has data.
+services:
+  - type: web
+    name: signalpost
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build && npx tsx agent/run.ts examples/sample-orgnrs.txt out --deadline-seconds 900
+    startCommand: npm start
+    healthCheckPath: /api/about
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.12.0

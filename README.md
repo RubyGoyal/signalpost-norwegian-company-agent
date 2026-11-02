@@ -253,6 +253,10 @@ The offline self-test (140 checks) runs against simulated registry, NAV and comp
 
 ## Web app
 
+**Online, no install:** [deploy it on Render's free plan](https://render.com/deploy?repo=https://github.com/RubyGoyal/signalpost-norwegian-company-agent) (`render.yaml`). The build runs the agent on the 10 sample companies, so the Batch results page has data. A free service sleeps when unused, and its first page after a pause can take up to a minute.
+
+**On your own computer:**
+
 ```bash
 npm run dev        # http://localhost:3000
 ```
