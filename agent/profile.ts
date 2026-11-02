@@ -644,7 +644,7 @@ function websiteClaims(b: ClaimBuilder, id: CompanyIdentity, w: WebsiteOutcome):
       { confidence: v.confidence ?? 0.9 }
     );
   }
-  for (const p of profilesFrom(v, id.legalName)) {
+  for (const p of profilesFrom(v, id.legalName, { soleProprietorship: id.formCode === 'ENK' })) {
     b.add(p.page.snapshot, 'company_profiles', 'social_profile', p.profile.url, { platform: p.profile.platform, url: p.profile.url }, `${p.via}: ${p.profile.url}`, {
       confidence: 0.9,
     });

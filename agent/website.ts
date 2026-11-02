@@ -741,12 +741,15 @@ function linkNamesSomeoneElse(text: string, legalName: string, others: string[])
   return others.some((n) => t.includes(` ${n.replace(/\s+(as|asa|sa|ans|da|nuf|ks)$/, '')} `));
 }
 
-export function socialMatchesIdentity(p: SocialProfile, legalName: string, verdict?: SiteVerdict): boolean {
+export function socialMatchesIdentity(p: SocialProfile, legalName: string, verdict?: SiteVerdict, soleProprietorship = false): boolean {
   const handle = decodeURIComponent(new URL(p.url).pathname.split('/').filter(Boolean).pop() || '').replace(/^@/, '');
-  return handleMatchesName(handle, legalName) || (!!verdict && handleIsSiteBrand(handle, verdict, legalName));
+  // A sole proprietorship's site is usually named after its owner ("helleland.one" for Advokat
+  // Helleland), so an account named after the domain is the owner's own profile: only a handle
+  // with the whole business name counts.
+  return handleMatchesName(handle, legalName) || (!soleProprietorship && !!verdict && handleIsSiteBrand(handle, verdict, legalName));
 }
 
-export function profilesFrom(verdict: SiteVerdict, legalName: string): { profile: SocialProfile; page: PageAnalysis; via: string }[] {
+export function profilesFrom(verdict: SiteVerdict, legalName: string, opts: { soleProprietorship?: boolean } = {}): { profile: SocialProfile; page: PageAnalysis; via: string }[] {
   const out = new Map<string, { profile: SocialProfile; page: PageAnalysis; via: string }>();
   const refused = new Set<string>();
   const others = otherEntities(verdict.pages, legalName);
@@ -761,7 +764,7 @@ export function profilesFrom(verdict: SiteVerdict, legalName: string): { profile
         out.delete(p.url);
         continue;
       }
-      if (out.has(p.url) || !socialMatchesIdentity(p, legalName, verdict)) continue;
+      if (out.has(p.url) || !socialMatchesIdentity(p, legalName, verdict, !!opts.soleProprietorship)) continue;
       out.set(p.url, { profile: p, page, via });
     }
   }
