@@ -26,6 +26,7 @@ async function envelopeStats(file: string) {
     withNavJobs: 0,
     withWebsite: 0,
     errorsBySource: {} as Record<string, number>,
+    websiteErrorReasons: {} as Record<string, number>,
     failed: 0,
   };
   if (!existsSync(file)) return s;
@@ -43,7 +44,16 @@ async function envelopeStats(file: string) {
     if (fields.has('site_job')) s.withSiteJobs++;
     if (fields.has('job_ad')) s.withNavJobs++;
     if (fields.has('website')) s.withWebsite++;
-    for (const er of e.errors || []) s.errorsBySource[er.source] = (s.errorsBySource[er.source] || 0) + 1;
+    for (const er of e.errors || []) {
+      s.errorsBySource[er.source] = (s.errorsBySource[er.source] || 0) + 1;
+      // "domain: reason; domain: reason" for a website check that could not finish.
+      if (er.source === 'company_website')
+        for (const part of String(er.message || '').split('; ')) {
+          const reason = part.includes(': ') ? part.slice(part.indexOf(': ') + 2) : part;
+          const k = reason.replace(/\d+/g, 'N').slice(0, 80) || er.code;
+          s.websiteErrorReasons[k] = (s.websiteErrorReasons[k] || 0) + 1;
+        }
+    }
   }
   return s;
 }
@@ -80,6 +90,12 @@ out.push(`- Dated news posts: ${n(web.dated_news_posts ?? st.newsPosts)} (compan
 out.push(`- Job ads from careers pages: ${n(web.job_ads)} (companies: ${n(st.withSiteJobs)})`);
 out.push(`- Companies with NAV job ads: ${n(st.withNavJobs)}`);
 out.push(`- NAV feed: ${nav.ok ? 'read' : 'NOT read'}; ${n(nav.active_ads)} active ads indexed from ${n(nav.entries_read)} feed entries; detail scan complete: ${nav.detail_scan_complete ? 'yes' : 'no'}`);
+if (Object.keys(st.websiteErrorReasons).length) {
+  out.push('');
+  out.push('Website checks that could not finish, by reason:');
+  out.push('');
+  for (const [k, v] of Object.entries(st.websiteErrorReasons).sort((a, b) => b[1] - a[1]).slice(0, 12)) out.push(`- ${k}: ${n(v)}`);
+}
 const left = report.quality?.websites?.not_published_by_reason || {};
 if (Object.keys(left).length) {
   out.push('');

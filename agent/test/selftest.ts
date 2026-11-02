@@ -8,7 +8,7 @@ import { sameRegistryEvent, utcDay } from '../extract.ts';
 import { parseInputText } from '../input.ts';
 import { qualityReport } from '../quality.ts';
 import { checkUrlShape, isPublicAddress, parseRobots, robotsAllows } from '../web.ts';
-import { feedItems, findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, profilesFrom, publishedDate, sameCompanyName, saysNoOpenings } from '../website.ts';
+import { PLACEHOLDER_POST, feedItems, findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, profilesFrom, publishedDate, sameCompanyName, saysNoOpenings } from '../website.ts';
 import type { Envelope } from '../types.ts';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
@@ -218,6 +218,14 @@ const w4 = wrun('web4', { MOCK_NO_WEB: '1' });
 check(by(w4, '910000098').availability.official_website.reason === 'website_check_not_run' && !by(w4, '910000098').refresh.changes.some((c) => c.type === 'removed_value'), 'no public web: website step reported as not run, no false removals');
 const w5 = wrun('web5', { SIGNALPOST_JOBS_DETAIL_SCAN: 'off' });
 check(wc('910000063', 'job_ad').length === 2 && by(w5, '910000063').claims.filter((c) => c.field === 'job_ad').length === 1, 'hiring: without the full ad read only the name-matched ad is found (fallback still confirms by number)');
+const w6 = wrun('web6', { MOCK_SITE_GONE: '1' });
+const goneChanges = ['910000098', '910001000'].flatMap((o) => by(w6, o).refresh.changes.filter((c) => c.type === 'removed_value'));
+check(
+  !by(w6, '910000098').claims.some((c) => c.field === 'website') && !by(w6, '910001000').claims.some((c) => c.field === 'website') && goneChanges.length === 0,
+  `live run on 1,000 companies: a verified site that does not answer on a re-run is not published, and is not reported as removed (got ${goneChanges.map((c) => c.field).join(',')})`
+);
+const w7 = wrun('web7');
+check(['910000098', '910001000'].every((o) => by(w7, o).refresh.changes.length === 0 && by(w7, o).claims.some((c) => c.field === 'website') && by(w7, o).claims.some((c) => c.field === 'site_news')), `live run on 1,000 companies: when that site answers again, it and its news are back with no change reported in either direction (got ${['910000098', '910001000'].flatMap((o) => by(w7, o).refresh.changes.map((c) => c.type + ' ' + c.field)).join(', ')})`);
 
 // --- Site news, careers page and the at-a-glance summary ---------------------------------
 const aW = by(w1, '910000063');
@@ -258,6 +266,7 @@ check(!wc('910000896', 'site_news').length && wa('910000896').official_website.s
 check(wc('910000993', 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).join('|') === '2026-09-12 Nytt kontor i Arendal', `news (Builderr feedback): a dated post shown on the homepage is read when the site has no news page; an undated card, a service page and a card whose date disagrees with the date in its own address (live check: treteam.no) are not (got ${wc('910000993', 'site_news').map((c) => (c.value as any).title).join('|')})`);
 check(wc('910000993', 'site_job').map((c) => `${(c.value as any).title} | ${(c.value as any).url}`).sort().join() === 'Rekrutteringskonsulent | https://emp.jobylon.com/jobs/50001-sigma-personal-rekrutteringskonsulent/,Selger | https://emp.jobylon.com/jobs/50003-sigma-personal-selger/' && by(w1, '910000993').evidence.some((e) => e.source_url.startsWith('https://emp.jobylon.com/jobs/50001')), `jobs (hand check: homely.no): single ads behind a careers page's link to the company's Jobylon list are read through the list's embed script; a client's ad on the list is left out (got ${wc('910000993', 'site_job').map((c) => (c.value as any).title).join('|')})`);
 check(wc('910000993', 'site_job').some((c) => (c.value as any).title === 'Selger' && (c.value as any).posted === '2024-02-28') && !wc('910000993', 'site_job').some((c) => (c.value as any).title === 'Lagermedarbeider'), "jobs (QA run, homely.no): an old \"apply as soon as possible\" ad that the employer's live Jobylon list still carries is an opening; one whose page says it is closed is not");
+check(['Hello world!', 'Hei, verden!', 'Hallo verden', 'Hej världen!', 'Velkommen til bloggen min'].every((t) => PLACEHOLDER_POST.test(t)) && !['Hei, verden! Vi har åpnet nytt kontor', 'Our first post-pandemic fair', 'Nytt kontor i Arendal'].some((t) => PLACEHOLDER_POST.test(t)), 'news (live run on 1,000 companies): a new site\'s sample post ("Hei, verden!", "Hello world!") is not news');
 check(wc('910001000', 'site_news').map((c) => (c.value as any).title).join() === 'Ny utstilling i Skien' && by(w1, '910001000').evidence.some((e) => e.source_url === 'https://www.idehuset.no/feed/'), 'news (Builderr feedback): a feed the site does not declare is read at the standard WordPress address');
 const aW3 = by(w3, '910000063');
 check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news'), 'website down: no false removals of site news or job ads');

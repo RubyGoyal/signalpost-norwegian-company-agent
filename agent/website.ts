@@ -839,6 +839,12 @@ const CAREERS_PATH = /\/(karriere|karrierer|jobb|jobbe-hos-oss|jobb-hos-oss|ledi
 const CAREERS_TEXT = /^(karriere|jobb hos oss|jobbe hos oss|ledige stillinger|stillinger|careers?|jobs|jobb|bli en av oss|work with us|join us|rekruttering)$/i;
 const GENERIC_LINK = /^(les mer|les hele|se mer|mer|søk|søk her|søk nå|se stilling|se alle|vis alle|apply|apply now|read more|her|klikk her|ledige stillinger|karriere|jobb|nyheter|aktuelt|news|blogg|forrige|neste|next|previous)$/i;
 // Menu and paging labels on news pages ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"): not posts.
+// The sample post a new site comes with (WordPress's "Hello world!" in its usual languages, and the
+// site builders' "first post" placeholders): it is not news from the company (live run on 1,000
+// companies: "Hei, verden!" on two fresh WordPress sites).
+export const PLACEHOLDER_POST = /^(hello,? world|hei,? verden|hallo,? verden|hej,? (verden|v[aä]rlden)|hallo,? welt|bonjour tout le monde|hola,? mundo|(this is )?(my|your|the) first (blog )?post|f[oø]rste (blogg)?innlegg|mitt f[oø]rste innlegg|velkommen til (min |v[aå]r )?blogg(en)?( min)?)\s*[!.]*$/i;
+export const PLACEHOLDER_POST_URL = /\/(hello-world|hei-verden|hallo-verden|hej-varlden|hej-verden|hallo-welt|hola-mundo|bonjour-tout-le-monde)\/?(?:[?#].*)?$/i;
+
 const NEWS_NAV_LABEL = new RegExp(
   [
     '^(se|vis|les|g[aå] til|til|alle|flere|mer|eldre|nyere|tidligere|siste|more|see|view|show|all|older|newer|latest|back to|tilbake til)\\s+((alle|flere|mer|more|all|our|v[aå]re|de|the)\\s+)*(nyheter|nyhetene|nyhetssaker|saker|sakene|artikler|artiklene|innlegg|innleggene|news|posts|articles|stories|aktuelt|blogg|blogginnlegg|pressemeldinger|arkiv|archive|nytt)\\b(\\s+\\S+){0,3}\\s*$',
@@ -1243,6 +1249,7 @@ export async function readSiteActivity(
     if (inUrl && Math.abs(Date.parse(`${inUrl[1]}-${inUrl[2]}-${inUrl[3]}`) - Date.parse(date)) > 864e5) return;
     const t = title.replace(/[\s\u00a0]+/g, ' ').replace(/^[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+|[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+$/g, '').trim();
     if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t) || NEWS_NAV_LABEL.test(t)) return;
+    if (PLACEHOLDER_POST.test(t) || PLACEHOLDER_POST_URL.test(url)) return;
     seen.add(url);
     act.news.push({ date, title: t, url, snapshot, via });
   };

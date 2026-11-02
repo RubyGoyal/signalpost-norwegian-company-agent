@@ -24,6 +24,7 @@ import {
   normalizeSocial,
   phoneDigits,
   profilesFrom,
+  registrableDomain,
   registeredSitePlausible,
   siteContacts,
   type CompanyIdentity,
@@ -1010,10 +1011,33 @@ export async function assembleCompany(g: Gathered, ctx: RunContext): Promise<Env
   // Contact links read from the company website are only re-checked when the site was verified again.
   const siteVerified = !!g.website?.verified;
   const careersChecked = !!g.website?.activity?.careersChecked;
+  // A website published last time is reported as removed only when this run settled that it is not
+  // the company's own (a group's, another company's, parked) or the register stopped listing it. A
+  // site that did not answer this time (unreachable, refused, not reached in the time budget) is
+  // not re-checked: sites go down for an hour, and a daily run must not flip them in and out.
+  const siteStatus = new Map<string, string>();
+  for (const v of g.website?.verdicts || []) siteStatus.set(v.candidate.domain, v.status);
+  const registeredNow = String(g.ent?.json?.hjemmeside || '').trim().toLowerCase();
+  const websiteNotRechecked = (c: Claim) => {
+    if (c.field !== 'website') return false;
+    const val = (c.value || {}) as any;
+    if (val.as_registered && String(val.as_registered).trim().toLowerCase() !== registeredNow) return false;
+    let domain = typeof val.domain === 'string' ? val.domain : '';
+    if (!domain)
+      try {
+        domain = registrableDomain(new URL(String(val.url)).hostname);
+      } catch {
+        return false;
+      }
+    const st = siteStatus.get(domain);
+    return !st || st === 'no_site' || st === 'error' || st === 'blocked';
+  };
   const notRechecked = (c: Claim) =>
     UNCHECKED_REASONS.has(availability[c.family]?.reason) ||
+    websiteNotRechecked(c) ||
     (c.field === 'job_ad' && jobsOutcome !== 'ok') ||
     (c.family === 'contact_points' && c.key.includes('#website#') && !siteVerified) ||
+    (c.field === 'site_news' && !siteVerified) ||
     (c.family === 'job_postings' && c.key.includes('#site#') && !(siteVerified && careersChecked));
   if (prev) {
     const prevByKey = new Map(prev.claims.map((c) => [c.key, c]));
