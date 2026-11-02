@@ -420,7 +420,7 @@ export class WebClient {
   }
 
   /** Fetches one HTML page (or, with kind 'feed', an RSS/Atom news feed), honouring robots.txt. Never throws. */
-  async getPage(url: string, snapshotId: string, signal?: AbortSignal, kind: 'html' | 'feed' = 'html'): Promise<WebResult> {
+  async getPage(url: string, snapshotId: string, signal?: AbortSignal, kind: 'html' | 'feed' | 'script' = 'html'): Promise<WebResult> {
     const now = () => new Date().toISOString();
     if (this.disabledReason) return { outcome: 'error', error: this.disabledReason, snapshot: this.snapshot(url, { retrieved_at: now(), error: this.disabledReason }, snapshotId) };
     try {
@@ -436,7 +436,7 @@ export class WebClient {
       }
       if (!robotsAllows(rules, shape.url.pathname + shape.url.search))
         return { outcome: 'blocked', error: 'robots_txt_disallows', snapshot: this.snapshot(url, { retrieved_at: now(), error: 'robots_txt_disallows' }, snapshotId) };
-      const accept = kind === 'feed' ? 'application/rss+xml,application/atom+xml,application/xml;q=0.9,text/xml;q=0.9,*/*;q=0.1' : 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1';
+      const accept = kind === 'feed' ? 'application/rss+xml,application/atom+xml,application/xml;q=0.9,text/xml;q=0.9,*/*;q=0.1' : kind === 'script' ? 'application/javascript,text/javascript;q=0.9,*/*;q=0.1' : 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1';
       const r = await this.guardedGet(url, accept, this.opts.maxBytes, signal);
       const retrieved = now();
       if (!r.ok) {
@@ -459,7 +459,7 @@ export class WebClient {
         return { outcome: 'error', error: `http_${r.status}`, snapshot: this.snapshot(r.finalUrl.href, { retrieved_at: retrieved, http_status: r.status, error: `http_${r.status}` }, snapshotId) };
       if (r.tooBig || !r.bytes)
         return { outcome: 'error', error: 'page_too_large', snapshot: this.snapshot(r.finalUrl.href, { retrieved_at: retrieved, http_status: r.status, error: 'page_too_large' }, snapshotId) };
-      if (!(kind === 'feed' ? /(rss|atom|xml)/i : /html/i).test(r.contentType))
+      if (!(kind === 'feed' ? /(rss|atom|xml)/i : kind === 'script' ? /(javascript|ecmascript)/i : /html/i).test(r.contentType))
         return { outcome: 'not_html', error: 'not_html', snapshot: this.snapshot(r.finalUrl.href, { retrieved_at: retrieved, http_status: r.status, error: 'not_html' }, snapshotId) };
       const sha = createHash('sha256').update(r.bytes).digest('hex');
       const html = decode(r.bytes, charsetOf(r.contentType, r.bytes));

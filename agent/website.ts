@@ -1414,6 +1414,26 @@ export async function readSiteActivity(
         const url = `${u.origin}${u.pathname}${u.search}`;
         if (!adLinks.includes(url) && !seen.has(url)) adLinks.push(url);
       }
+      // A careers page often links only to the company's list on Jobylon, which its page fills in
+      // with a script. The list's own embed script names the single ads; each is then read like
+      // any other ad (it must name this company as the hiring organisation and be live).
+      const jobylon = new Set<string>();
+      for (const a of anchorsWithPos(r.page.html, r.page.url)) {
+        const m = a.url.match(/^https:\/\/emp\.jobylon\.com\/companies\/(\d+)(?:-[\w-]*)?\/?(?:[?#].*)?$/i);
+        if (m) jobylon.add(m[1]);
+      }
+      for (const m of r.page.html.matchAll(/https:\/\/cdn\.jobylon\.com\/jobs\/companies\/(\d+)\/embed/gi)) jobylon.add(m[1]);
+      for (const cid of [...jobylon].slice(0, 2)) {
+        if (signal?.aborted) break;
+        const list = await web.getPage(`https://cdn.jobylon.com/jobs/companies/${cid}/embed/v1/?page_size=20`, `${snapPrefix}:joblist:${cid}`, signal, 'script');
+        if (list.outcome !== 'ok') continue;
+        act.snapshots.push(list.page.snapshot);
+        const ads = list.page.html.replace(/\\\//g, '/').matchAll(/https:\/\/emp\.jobylon\.com\/jobs\/(\d{3,})-[\w-]+\/?/gi);
+        for (const m of ads) {
+          const url = m[0].endsWith('/') ? m[0] : `${m[0]}/`;
+          if (!adLinks.includes(url) && !seen.has(url)) adLinks.push(url);
+        }
+      }
       for (const url of adLinks) {
         if (signal?.aborted || adReads >= MAX_AD_PAGES) break;
         const ad = await web.getPage(url, `${snapPrefix}:job:${adReads++}`, signal);

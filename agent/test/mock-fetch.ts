@@ -324,6 +324,8 @@ const DNS: Record<string, string> = {
   'www.omega-test.no': PUBLIC_IP,
   'www.butikkjeden.no': PUBLIC_IP,
   'www.sigmapersonal.no': PUBLIC_IP,
+  'cdn.jobylon.com': PUBLIC_IP,
+  'emp.jobylon.com': PUBLIC_IP,
   'www.idehuset.no': PUBLIC_IP,
   'www.xi-test.no': PUBLIC_IP,
 };
@@ -501,15 +503,43 @@ Object.assign(WEB, {
   },
   'www.sigmapersonal.no': {
     pages: {
+      '/jobb-hos-oss': page('Jobb hos oss – Sigma Personal', '<h1>Jobb hos oss</h1><p>Vi søker nå flere medarbeidere. <a href="https://emp.jobylon.com/companies/4242-sigma-personal/">Se våre stillingsannonser her</a>.</p>'),
       '/': page(
         'Bemanning & Rekruttering | Sigma Personal | Telemark & Agder',
         `<p>Vi leverer bemanning og rekruttering til bedrifter i Telemark og Agder. Ta kontakt med oss for en uforpliktende prat om hvordan vi kan hjelpe din bedrift med riktig kompetanse, raskt og trygt.</p>
+         <nav><a href="/jobb-hos-oss">Jobb hos oss</a></nav>
          <section><h2>Siste nytt</h2>
            <article><a href="/aktuelt/nytt-kontor-i-arendal"><h3>Nytt kontor i Arendal</h3></a><p>Publisert 12.09.2026</p></article>
            <article><a href="/aktuelt/sommerjobber-2026"><h3>Sommerjobber for studenter</h3></a></article>
            <article><a href="/tjenester/bemanning"><h3>Bemanning for industrien</h3></a><p>12.09.2026</p></article>
            <article><a href="/2026/03/27/paskeferie-2026/"><h3>Påskeferie 2026 for kontoret</h3></a><p>06.04.2026</p></article>
          </section>`
+      ),
+    },
+  },
+  // Hand check (homely.no): the careers page links only to the company's Jobylon list, which a
+  // script fills in. The list's embed script names the single ads.
+  'cdn.jobylon.com': {
+    pages: {
+      '/jobs/companies/4242/embed/v1/': {
+        type: 'application/javascript; charset=utf-8',
+        feed: String.raw`(function(){var html = '<ul class=\"jobylon-job-list\"><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50001-sigma-personal-rekrutteringskonsulent\/\">Rekrutteringskonsulent<\/a><\/li><li><a href=\"https:\/\/emp.jobylon.com\/jobs\/50002-kunde-as-sveiser\/\">Sveiser<\/a><\/li><\/ul>';})();`,
+      },
+    },
+  },
+  'emp.jobylon.com': {
+    pages: {
+      '/companies/4242-sigma-personal/': page('Sigma Personal | Jobylon', '<h1>Available jobs</h1><div id="jobylon-jobs-widget"></div><script src="https://cdn.jobylon.com/jobs/companies/4242/embed/v1/?target=jobylon-jobs-widget"></script>'),
+      '/jobs/50001-sigma-personal-rekrutteringskonsulent/': page(
+        'Rekrutteringskonsulent - Sigma Personal Telemark | Jobylon',
+        '<h1>Rekrutteringskonsulent</h1><p>Bli med i teamet vårt i Skien.</p>',
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Rekrutteringskonsulent","datePosted":"2026-10-20","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Sigma Personal Telemark AS"}}</script>'
+      ),
+      // A client's job listed by the agency: not this company's own opening.
+      '/jobs/50002-kunde-as-sveiser/': page(
+        'Sveiser - Kunde AS | Jobylon',
+        '<h1>Sveiser</h1>',
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Sveiser","datePosted":"2026-10-20","validThrough":"2099-01-01","hiringOrganization":{"@type":"Organization","name":"Kunde AS"}}</script>'
       ),
     },
   },
