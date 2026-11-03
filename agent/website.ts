@@ -1550,12 +1550,33 @@ export async function readSiteActivity(
           if (!adLinks.includes(url) && !seen.has(url)) adLinks.push(url);
         }
       }
+      // The ad pages are read a few at a time (full live run: a slow job platform read one ad after
+      // another ran out of the site's time budget), then judged in the order the list gives them.
+      const toRead: { url: string; n: number }[] = [];
       for (const url of adLinks) {
-        if (signal?.aborted || adReads >= MAX_AD_PAGES) {
+        if (adReads >= MAX_AD_PAGES) {
           cutShort();
           break;
         }
-        const ad = await web.getPage(url, `${snapPrefix}:job:${adReads++}`, signal);
+        toRead.push({ url, n: adReads++ });
+      }
+      const fetched: (Awaited<ReturnType<WebClient['getPage']>> | null)[] = new Array(toRead.length).fill(null);
+      let nextAd = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(4, toRead.length) }, async () => {
+          while (nextAd < toRead.length) {
+            const i = nextAd++;
+            if (signal?.aborted) continue;
+            fetched[i] = await web.getPage(toRead[i].url, `${snapPrefix}:job:${toRead[i].n}`, signal);
+          }
+        })
+      );
+      for (const [i, { url }] of toRead.entries()) {
+        const ad = fetched[i];
+        if (!ad) {
+          cutShort();
+          continue;
+        }
         const snap = ad.outcome === 'ok' ? ad.page.snapshot : ad.snapshot;
         snap.publisher = `The company (its job ad on ${new URL(url).hostname}, linked from its careers page)`;
         act.snapshots.push(snap);

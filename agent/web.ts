@@ -213,6 +213,31 @@ export class WebClient {
   private active = 0;
   private queue: (() => void)[] = [];
   private robots = new Map<string, Promise<RobotsRules>>();
+  // Origins whose robots.txt, and hosts whose address lookup, failed for a passing reason (a
+  // timeout, a server error): forgetFailures() lets a second look try them again.
+  private failedOrigins = new Set<string>();
+  private failedHosts = new Set<string>();
+
+  /** Forgets passing failures for these domains (and their subdomains), so the next visit tries again. */
+  forgetFailures(domains: string[]): void {
+    const hit = (h: string) => domains.some((d) => d && (h === d || h.endsWith(`.${d}`)));
+    for (const o of [...this.failedOrigins]) {
+      let h = '';
+      try {
+        h = new URL(o).hostname;
+      } catch {
+        continue;
+      }
+      if (!hit(h)) continue;
+      this.robots.delete(o);
+      this.failedOrigins.delete(o);
+    }
+    for (const h of [...this.failedHosts])
+      if (hit(h)) {
+        this.dns.delete(h);
+        this.failedHosts.delete(h);
+      }
+  }
   private dns = new Map<string, Promise<string[]>>();
   requestsUsed = 0;
   /** Network-level outcomes, for the circuit breaker. */
@@ -302,6 +327,7 @@ export class WebClient {
     } catch (e: any) {
       const code = String(e?.code || '');
       if (code === 'ENOTFOUND' || code === 'ENODATA' || code === 'NXDOMAIN') return 'no_such_host';
+      this.failedHosts.add(host);
       return 'dns_error';
     }
   }
@@ -408,9 +434,15 @@ export class WebClient {
       p = (async () => {
         const r = await this.guardedGet(`${origin}/robots.txt`, 'text/plain,*/*;q=0.5', 256_000, signal);
         // Unreachable robots.txt (network error or 5xx): full disallow, per RFC 9309 2.3.1.4.
-        if (!r.ok) return { disallowAll: true, unreachable: r.error, rules: [] };
+        if (!r.ok) {
+          if (r.error !== 'no_such_host') this.failedOrigins.add(origin);
+          return { disallowAll: true, unreachable: r.error, rules: [] };
+        }
         if (r.status >= 400 && r.status < 500) return { allowAll: true, rules: [] };
-        if (r.status >= 500) return { disallowAll: true, unreachable: `http_${r.status}`, rules: [] };
+        if (r.status >= 500) {
+          this.failedOrigins.add(origin);
+          return { disallowAll: true, unreachable: `http_${r.status}`, rules: [] };
+        }
         if (r.tooBig || !r.bytes) return { allowAll: true, rules: [] }; // an absurd robots.txt is ignored, not obeyed
         return parseRobots(decode(r.bytes, 'utf-8'));
       })();

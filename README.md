@@ -13,7 +13,7 @@ Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/sig
 | Full live run, 1,000 companies | The official command on GitHub's servers (3 November 2026, commit `0788c6e`): 1,000 of 1,000 envelopes `available`, 60,262 facts each with its evidence, all quality checks passed, 314 seconds. An immediate re-run flagged 1 change: a slow site found the second time. It can be repeated from the Actions tab ("Full live run"), in this repository or in a fork. |
 | Accuracy | A hand check by a person of 52 published website items: of the 43 she could judge, 40 right (every website, social account and news post), 3 wrong (job decisions: one since fixed, one page changed after the run, one open-application list). Claude's separate cross-check of the same items: 49 right, 2 wrong (both fixed), 1 can't tell. The two checks agree on 40 of the 42 items both judged. |
 | Live QA | An outside QA agent (Momentic) tested the live demo and found 10 issues, all fixed. Its second run confirmed 9 of them; the tenth only shows when a source changes, and an offline test covers it. |
-| Offline tests | 155 checks: `npm run check:signalpost` |
+| Offline tests | 156 checks: `npm run check:signalpost` |
 
 ## What's new in version 5
 
@@ -119,7 +119,7 @@ Optional flags and environment variables:
 - **Exact identity.** Every Brønnøysund register is queried by the exact organisation number, after a modulus-11 check, so facts cannot attach to a namesake, parent or subsidiary. NAV job ads and websites are attached only after their own evidence confirms the organisation number or the exact company (see below).
 - **No invented values.** A value is published only if the register holds it. If a register cannot be reached after retries, that family is `failed` and has no claims. If the identity lookup fails, the company is `failed` with zero claims.
 - **Missing is not zero.** An employee count is published only when the register says one is registered. Accounts figures are published only when present in the filing, and always with their reporting period.
-- **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage, an unreachable website or a skipped step never shows up as removed facts. A website published before that does not answer on a re-run is not published that day and is not reported as removed; it is reported only when a check shows the site is no longer the company's own or the register stops listing it. Its news posts are kept too, so they do not come back as "new" when the site answers again. Job ads from a careers page are reported as closed only when the careers page and every ad it leads to were read; if a job list or an ad could not be read, or the time budget ran out, the earlier openings are kept as they were.
+- **Idempotent refresh.** Claim and evidence IDs come from content hashes, so re-running on the same data produces the same IDs and zero changes. Real changes record before and after values and keep the previous evidence. A source outage, an unreachable website or a skipped step never shows up as removed facts. A website published before that does not answer on a re-run is not published that day and is not reported as removed; it is reported only when a check shows the site is no longer the company's own or the register stops listing it. Its news posts are kept too, so they do not come back as "new" when the site answers again. A website check that ends without a verified site because a site or an address lookup did not answer in time gets a second look in the same run, after the failure is forgotten: a site is often slow only on its first visit. Job ads from a careers page are reported as closed only when the careers page and every ad it leads to were read; if a job list or an ad could not be read, or the time budget ran out, the earlier openings are kept as they were.
 - **Personal data minimisation.** Role holders' names are published (they are public register data). Birth dates are not. Job ad contact persons are never published, and contact details of sole proprietorships are left out.
 - **Hiring by organisation number.** Every active NAV ad's detail record is read once per run and indexed by the employer's organisation number, so an ad posted under a brand name is still found and a namesake employer never matches. If that read cannot finish in its time budget, the remaining ads are picked by employer name and still confirmed by organisation number.
 - **A website is a claim only after proof, even when the registry lists it.** Candidate sites (registered website, registered email domain, domains spelled from the legal name) are only guesses. A site is published as the company's own when it shows the company's organisation number, or when it carries the company's exact name and (for name-spelled domains) also the registered phone number or street address. Registries often list a parent group's, chain's or brand's site, so a registered website is not published when:
@@ -271,19 +271,20 @@ The first run also noted that a filter matching nothing showed an empty table (i
 
 Results of the three runs (2 and 3 November 2026; details in [`examples/full-run-v5-report.json`](examples/full-run-v5-report.json)):
 
-| | Run 1 (`ffcba6e`) | Run 2 (`a44e21b`) | Run 3 (`0788c6e`) |
-|---|---:|---:|---:|
-| Envelopes `available` | 1,000 of 1,000 | 1,000 of 1,000 | 1,000 of 1,000 |
-| Facts, all with evidence | 60,254 | 60,253 | 60,262 |
-| Quality checks | all passed | all passed | all passed |
-| Runtime | 312 s | 299 s | 314 s |
-| Requests (registry / NAV / websites) | 5,003 / 8,383 / 2,790 | 5,003 / 8,400 / 2,862 | 5,003 / 8,249 / 2,921 |
-| Website checks that could not finish | 36 | 32 | 14 |
-| Changes flagged by an immediate re-run | 14 | 22 | 1 |
+| | Run 1 (`ffcba6e`) | Run 2 (`a44e21b`) | Run 3 (`0788c6e`) | Run 4 (`64ce675`) |
+|---|---:|---:|---:|---:|
+| Envelopes `available` | 1,000 of 1,000 | 1,000 of 1,000 | 1,000 of 1,000 | 1,000 of 1,000 |
+| Facts, all with evidence | 60,254 | 60,253 | 60,262 | 60,232 |
+| Quality checks | all passed | all passed | all passed | all passed |
+| Runtime | 312 s | 299 s | 314 s | 365 s |
+| Requests (registry / NAV / websites) | 5,003 / 8,383 / 2,790 | 5,003 / 8,400 / 2,862 | 5,003 / 8,249 / 2,921 | 5,003 / 8,270 / 2,851 |
+| Website checks that could not finish | 36 | 32 | 14 | 22 |
+| Changes flagged by an immediate re-run | 14 | 22 | 1 | 28 |
 
 - Coverage in run 3, by companies: legal identity, status and group structure 100%; address, industry and roles 99.6%; annual accounts 99.9%; sub-units 75%; contact points 39.1%; employee count 14.8% (most small companies register none); verified or registered official website 12.6%; company-owned profiles 4.5% (81 accounts); dated news from the company's own site for 19 companies (114 posts); job ads for 4 companies.
 - Found and fixed between runs: a new site's "Hei, verden!" sample post read as news (run 1); a verified site that did not answer on the re-run reported as removed (run 1); Homely's 6 careers-page openings reported as closed on the re-run, because its job list could not be read in time (run 2). The website step's time budget per company also went from 20 to 30 seconds, which cut checks that ran out of time from 24 to 6.
 - The one change left in run 3 is a site that answered slowly the first time and was found on the re-run. That is a real addition, not a false change.
+- Run 4 (after the hand-check fixes) met a slower network: more address lookups failed (14) and more sites were slow on their first visit, so its re-run found 8 more websites and their news and accounts (28 additions, no false removals), and Homely's six ads were not all read in the time budget on the first pass. Since then a website check that did not get an answer gets a second look in the same run, and job ad pages are read four at a time.
 - Run 1's re-run also dropped a registered website (clemenskraft.no) that the first pass could not read in time and kept as registered. The re-run read it: it shows a different company's organisation number, so dropping it was right.
 
 To smoke-test against the live registry on a random sample of real companies:
@@ -293,7 +294,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (155 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (156 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum

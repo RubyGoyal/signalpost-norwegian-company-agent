@@ -1,122 +1,242 @@
 {
-  "what": "Full live runs of the official command on 1,000 real companies, on GitHub-hosted runners (workflow .github/workflows/full-run.yml): npm ci, the offline checks, `npx tsx agent/run.ts examples/smoke-1000.txt out`, then the same command again at once as a refresh check. Figures copied from each run's summary (scripts/run-summary.ts).",
-  "input": "examples/smoke-1000.txt (1,000 organisation numbers drawn at random from Builderr's company list)",
-  "runs": [
-    {
-      "date": "2026-11-02",
-      "commit": "ffcba6eaec953561ed4cae73a4f587ea8eddb377",
-      "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41438990843",
-      "envelopes": 1000,
-      "states": { "available": 1000 },
-      "claims": 60254,
-      "quality_checks": "all passed",
-      "runtime_seconds": 312,
-      "per_company_ms": { "p50": 8036, "p95": 20203 },
-      "requests": { "brreg": 5003, "nav": 8383, "company_websites": 2790 },
-      "cost_usd": 0,
-      "website_checks_not_finished": 36,
-      "rerun": {
-        "runtime_seconds": 270,
-        "changes": 14,
-        "by_kind": { "new site_news": 6, "new website": 4, "new email": 1, "new phone": 1, "removed website": 1, "new social_profile": 1 }
-      },
-      "found": [
-        "A new WordPress site's sample post (\"Hei, verden!\") published as news for 2 companies.",
-        "A verified site that did not answer on the re-run would be reported as removed."
-      ]
-    },
-    {
-      "date": "2026-11-02",
-      "commit": "a44e21bd2f5686fbb40d2f9aedb446c59ba371f4",
-      "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41441302879",
-      "envelopes": 1000,
-      "states": { "available": 1000 },
-      "claims": 60253,
-      "quality_checks": "all passed",
-      "runtime_seconds": 299,
-      "per_company_ms": { "p50": 7715, "p95": 20143 },
-      "requests": { "brreg": 5003, "nav": 8400, "company_websites": 2862 },
-      "cost_usd": 0,
-      "website_checks_not_finished": 32,
-      "website_checks_not_finished_by_reason": { "website_time_budget_reached": 24, "dns_error": 9, "timeout": 6, "no_such_host": 2 },
-      "rerun": {
-        "runtime_seconds": 312,
-        "changes": 22,
-        "by_kind": { "removed site_job": 6, "new website": 4, "new site_news": 4, "new social_profile": 3, "new email": 2, "new phone": 2, "removed website": 1 }
-      },
-      "found": [
-        "Homely's 6 careers-page openings reported as closed on the re-run, because its job list could not be read in time.",
-        "24 website checks ran out of their 20-second time budget."
-      ]
-    },
-    {
-      "date": "2026-11-03",
-      "commit": "0788c6e17ef3c07ac233a0fbeadb872f3dd98405",
-      "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41585353978",
-      "envelopes": 1000,
-      "states": { "available": 1000 },
-      "claims": 60262,
-      "quality_checks": "all passed",
-      "runtime_seconds": 314,
-      "per_company_ms": { "p50": 7449, "p95": 23649 },
-      "requests": { "brreg": 5003, "nav": 8249, "company_websites": 2921 },
-      "cost_usd": 0,
-      "models": [],
-      "source_errors": { "company_website": 26, "regnskapsregisteret": 1 },
-      "website_checks_not_finished": 14,
-      "website_checks_not_finished_by_reason": { "dns_error": 10, "website_time_budget_reached": 6, "timeout": 4, "http_N": 4, "no_such_host": 2 },
-      "companies_with_family_available": {
-        "legal_identity": 1000,
-        "registered_address": 996,
-        "industry": 996,
-        "employees": 148,
-        "status_flags": 1000,
-        "roles": 996,
-        "locations": 750,
-        "annual_accounts": 999,
-        "group_structure": 1000,
-        "public_activity": 1000,
-        "contact_points": 391,
-        "official_website": 126,
-        "company_profiles": 45,
-        "job_postings": 4
-      },
-      "from_company_websites": {
-        "verified_official_website": 110,
-        "social_profiles": 81,
-        "companies_with_social_profiles": 45,
-        "dated_news_posts": 114,
-        "companies_with_news": 19,
-        "news_posts_from_feeds": 103,
-        "careers_page_job_ads": 6,
-        "companies_with_careers_page_job_ads": 1
-      },
-      "companies_with_nav_job_ads": 3,
-      "nav_feed": { "read": true, "active_ads_indexed": 8129, "feed_entries_read": 117248, "detail_scan_complete": true },
-      "websites_not_published_by_reason": {
-        "not_available:no_verified_website_found": 812,
-        "not_available:registered_website_not_verified": 18,
-        "failed:website_check_incomplete": 14,
-        "not_available:registered_website_belongs_to_another_entity": 13,
-        "not_available:registered_website_not_reachable": 12,
-        "blocked:robots_txt_disallows": 2,
-        "ambiguous:registered_website_shows_several_companies": 1,
-        "not_available:registered_website_is_a_social_profile": 1,
-        "blocked:site_refuses_automated_access_http_429": 1
-      },
-      "rerun": {
-        "runtime_seconds": 232,
-        "changes": 1,
-        "by_kind": { "new website": 1 },
-        "note": "A site that answered slowly on the first pass (byggarkitekten.no, found from the company name) was found on the re-run: a real addition, not a false change."
-      }
+ "what": "Full live runs of the official command on 1,000 real companies, on GitHub-hosted runners (workflow .github/workflows/full-run.yml): npm ci, the offline checks, `npx tsx agent/run.ts examples/smoke-1000.txt out`, then the same command again at once as a refresh check. Figures copied from each run's summary (scripts/run-summary.ts).",
+ "input": "examples/smoke-1000.txt (1,000 organisation numbers drawn at random from Builderr's company list)",
+ "runs": [
+  {
+   "date": "2026-11-02",
+   "commit": "ffcba6eaec953561ed4cae73a4f587ea8eddb377",
+   "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41438990843",
+   "envelopes": 1000,
+   "states": {
+    "available": 1000
+   },
+   "claims": 60254,
+   "quality_checks": "all passed",
+   "runtime_seconds": 312,
+   "per_company_ms": {
+    "p50": 8036,
+    "p95": 20203
+   },
+   "requests": {
+    "brreg": 5003,
+    "nav": 8383,
+    "company_websites": 2790
+   },
+   "cost_usd": 0,
+   "website_checks_not_finished": 36,
+   "rerun": {
+    "runtime_seconds": 270,
+    "changes": 14,
+    "by_kind": {
+     "new site_news": 6,
+     "new website": 4,
+     "new email": 1,
+     "new phone": 1,
+     "removed website": 1,
+     "new social_profile": 1
     }
-  ],
-  "fixed_between_runs": [
-    "A new site's sample post (\"Hello world!\", \"Hei, verden!\") is not news.",
-    "A website published before that does not answer on a re-run is not reported as removed; its news posts are kept through the outage.",
-    "Careers-page job ads are reported as closed only when the careers page and every ad it leads to were read.",
-    "The website step's time budget per company went from 20 to 30 seconds."
-  ],
-  "note_on_clemenskraft": "On runs 1 and 2 the re-run dropped the registered website www.clemenskraft.no (company 989728504). The first pass could not read it in time and kept it as registered, since its domain carries the company's name; the re-run read it, and it shows a different organisation number (912511480), so dropping it was right."
+   },
+   "found": [
+    "A new WordPress site's sample post (\"Hei, verden!\") published as news for 2 companies.",
+    "A verified site that did not answer on the re-run would be reported as removed."
+   ]
+  },
+  {
+   "date": "2026-11-02",
+   "commit": "a44e21bd2f5686fbb40d2f9aedb446c59ba371f4",
+   "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41441302879",
+   "envelopes": 1000,
+   "states": {
+    "available": 1000
+   },
+   "claims": 60253,
+   "quality_checks": "all passed",
+   "runtime_seconds": 299,
+   "per_company_ms": {
+    "p50": 7715,
+    "p95": 20143
+   },
+   "requests": {
+    "brreg": 5003,
+    "nav": 8400,
+    "company_websites": 2862
+   },
+   "cost_usd": 0,
+   "website_checks_not_finished": 32,
+   "website_checks_not_finished_by_reason": {
+    "website_time_budget_reached": 24,
+    "dns_error": 9,
+    "timeout": 6,
+    "no_such_host": 2
+   },
+   "rerun": {
+    "runtime_seconds": 312,
+    "changes": 22,
+    "by_kind": {
+     "removed site_job": 6,
+     "new website": 4,
+     "new site_news": 4,
+     "new social_profile": 3,
+     "new email": 2,
+     "new phone": 2,
+     "removed website": 1
+    }
+   },
+   "found": [
+    "Homely's 6 careers-page openings reported as closed on the re-run, because its job list could not be read in time.",
+    "24 website checks ran out of their 20-second time budget."
+   ]
+  },
+  {
+   "date": "2026-11-03",
+   "commit": "0788c6e17ef3c07ac233a0fbeadb872f3dd98405",
+   "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41585353978",
+   "envelopes": 1000,
+   "states": {
+    "available": 1000
+   },
+   "claims": 60262,
+   "quality_checks": "all passed",
+   "runtime_seconds": 314,
+   "per_company_ms": {
+    "p50": 7449,
+    "p95": 23649
+   },
+   "requests": {
+    "brreg": 5003,
+    "nav": 8249,
+    "company_websites": 2921
+   },
+   "cost_usd": 0,
+   "models": [],
+   "source_errors": {
+    "company_website": 26,
+    "regnskapsregisteret": 1
+   },
+   "website_checks_not_finished": 14,
+   "website_checks_not_finished_by_reason": {
+    "dns_error": 10,
+    "website_time_budget_reached": 6,
+    "timeout": 4,
+    "http_N": 4,
+    "no_such_host": 2
+   },
+   "companies_with_family_available": {
+    "legal_identity": 1000,
+    "registered_address": 996,
+    "industry": 996,
+    "employees": 148,
+    "status_flags": 1000,
+    "roles": 996,
+    "locations": 750,
+    "annual_accounts": 999,
+    "group_structure": 1000,
+    "public_activity": 1000,
+    "contact_points": 391,
+    "official_website": 126,
+    "company_profiles": 45,
+    "job_postings": 4
+   },
+   "from_company_websites": {
+    "verified_official_website": 110,
+    "social_profiles": 81,
+    "companies_with_social_profiles": 45,
+    "dated_news_posts": 114,
+    "companies_with_news": 19,
+    "news_posts_from_feeds": 103,
+    "careers_page_job_ads": 6,
+    "companies_with_careers_page_job_ads": 1
+   },
+   "companies_with_nav_job_ads": 3,
+   "nav_feed": {
+    "read": true,
+    "active_ads_indexed": 8129,
+    "feed_entries_read": 117248,
+    "detail_scan_complete": true
+   },
+   "websites_not_published_by_reason": {
+    "not_available:no_verified_website_found": 812,
+    "not_available:registered_website_not_verified": 18,
+    "failed:website_check_incomplete": 14,
+    "not_available:registered_website_belongs_to_another_entity": 13,
+    "not_available:registered_website_not_reachable": 12,
+    "blocked:robots_txt_disallows": 2,
+    "ambiguous:registered_website_shows_several_companies": 1,
+    "not_available:registered_website_is_a_social_profile": 1,
+    "blocked:site_refuses_automated_access_http_429": 1
+   },
+   "rerun": {
+    "runtime_seconds": 232,
+    "changes": 1,
+    "by_kind": {
+     "new website": 1
+    },
+    "note": "A site that answered slowly on the first pass (byggarkitekten.no, found from the company name) was found on the re-run: a real addition, not a false change."
+   }
+  },
+  {
+   "date": "2026-11-03",
+   "commit": "64ce6759453113cb293e16e86406eb98cfca4cb2",
+   "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41597323212",
+   "envelopes": 1000,
+   "states": {
+    "available": 1000
+   },
+   "claims": 60232,
+   "quality_checks": "all passed",
+   "runtime_seconds": 365,
+   "per_company_ms": {
+    "p50": 8912,
+    "p95": 27557
+   },
+   "requests": {
+    "brreg": 5003,
+    "nav": 8270,
+    "company_websites": 2851
+   },
+   "cost_usd": 0,
+   "website_checks_not_finished": 22,
+   "website_checks_not_finished_by_reason": {
+    "dns_error": 14,
+    "website_time_budget_reached": 10,
+    "timeout": 4,
+    "http_N": 4,
+    "no_such_host": 3
+   },
+   "from_company_websites": {
+    "verified_official_website": 105,
+    "social_profiles": 78,
+    "companies_with_social_profiles": 45,
+    "dated_news_posts": 104,
+    "companies_with_news": 17,
+    "careers_page_job_ads": 1
+   },
+   "rerun": {
+    "runtime_seconds": 276,
+    "changes": 28,
+    "by_kind": {
+     "new site_news": 10,
+     "new website": 8,
+     "new social_profile": 4,
+     "new email": 3,
+     "new phone": 2,
+     "removed website": 1
+    },
+    "note": "All additions: sites slow on their first visit or whose address lookup failed were found by the re-run. The one removal is clemenskraft.no again (see note_on_clemenskraft)."
+   },
+   "found": [
+    "Sites slow on the first visit and passing address-lookup failures were only retried by the re-run.",
+    "Homely's six job ads were not all read within the time budget on the first pass (read one after another)."
+   ]
+  }
+ ],
+ "fixed_between_runs": [
+  "A new site's sample post (\"Hello world!\", \"Hei, verden!\") is not news.",
+  "A website published before that does not answer on a re-run is not reported as removed; its news posts are kept through the outage.",
+  "Careers-page job ads are reported as closed only when the careers page and every ad it leads to were read.",
+  "The website step's time budget per company went from 20 to 30 seconds.",
+  "A website check that ends without a verified site because of a passing failure (timeout, address lookup) gets a second look in the same run, with the failure forgotten.",
+  "Job ad pages behind a careers page are read four at a time."
+ ],
+ "note_on_clemenskraft": "On runs 1 and 2 the re-run dropped the registered website www.clemenskraft.no (company 989728504). The first pass could not read it in time and kept it as registered, since its domain carries the company's name; the re-run read it, and it shows a different organisation number (912511480), so dropping it was right."
 }

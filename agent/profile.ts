@@ -21,6 +21,7 @@ import type { WebClient } from './web.ts';
 import {
   findWebsite,
   isDirectoryUrl,
+  isTransient,
   normalizeSocial,
   phoneDigits,
   profilesFrom,
@@ -759,14 +760,29 @@ export async function gatherCompany(rawOrgnr: string, inputIndex: number, ctx: R
     })();
     const id = identityFrom(orgnr, ent.json);
     const webTask = (async () => {
+      const pagesOf = (w: WebsiteOutcome | undefined) => w?.verdicts.reduce((n, v) => n + v.snapshots.length, 0) ?? 0;
       try {
         g.website = await findWebsite(ctx.web, id, ctx.websiteBudgetMs ?? 30_000, since);
+        // A second look when no site was verified and a candidate did not answer in time (full live
+        // run: a site that is slow on its first visit, or a lookup that failed for a moment, was
+        // found only by the immediate re-run). The first visit has usually woken the site up.
+        const w = g.website;
+        const flaky = !w.verified && w.state !== 'disabled' && w.verdicts.some((v) => v.status === 'error' || (v.status === 'no_site' && isTransient(v.reason)));
+        if (flaky) {
+          ctx.web?.forgetFailures(w.verdicts.map((v) => v.candidate.domain));
+          const again = await findWebsite(ctx.web, id, Math.min(ctx.websiteBudgetMs ?? 30_000, 20_000), since);
+          // The look that is not kept still made requests; they are counted here.
+          if (again.verified || (w.state === 'incomplete' && again.state !== 'incomplete')) {
+            g.requests += pagesOf(w);
+            g.website = again;
+          } else g.requests += pagesOf(again);
+        }
       } catch (e: any) {
         g.website = { state: 'incomplete', verdicts: [], verified: null, registryVerdict: null };
         g.errors.push({ source: 'company_website', code: 'website_step_error', message: String(e?.message || e) });
       }
       // Pages fetched for this company (robots.txt reads are counted in the run total).
-      g.requests += g.website?.verdicts.reduce((n, v) => n + v.snapshots.length, 0) ?? 0;
+      g.requests += pagesOf(g.website);
     })();
     const [roles, accounts] = await Promise.all([
       ctx.client.get('roller', `/enhetsregisteret/api/enheter/${orgnr}/roller`, snapId('roller'), count),
