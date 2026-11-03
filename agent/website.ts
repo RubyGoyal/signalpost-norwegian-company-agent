@@ -120,6 +120,9 @@ const SCOPE_TOKENS = new Set([
   'bergen', 'trondheim', 'stavanger', 'kristiansand', 'tromso', 'drammen', 'fredrikstad', 'sandnes', 'bodo', 'alesund', 'sarpsborg', 'skien', 'haugesund', 'tonsberg', 'moss', 'porsgrunn', 'arendal', 'hamar', 'larvik', 'halden', 'lillehammer', 'molde', 'harstad', 'gjovik', 'kongsberg', 'narvik', 'alta', 'steinkjer', 'kristiansund', 'asker', 'baerum', 'lillestrom', 'ski', 'jessheim', 'horten', 'sandefjord', 'grimstad', 'mandal', 'floro', 'forde', 'elverum', 'kongsvinger', 'mo', 'mosjoen', 'sandnessjoen', 'hammerfest', 'kirkenes', 'vadso', 'egersund', 'bryne', 'stord', 'voss', 'notodden', 'honefoss', 'raufoss', 'orkanger', 'stjordal', 'levanger', 'namsos', 'svolvaer', 'sortland', 'finnsnes',
 ]);
 
+/** Site builders and hosts whose name is the domain label of a site they host ("x.wixsite.com"). */
+const HOSTING_LABELS = new Set(['wixsite', 'wix', 'weebly', 'wordpress', 'blogspot', 'squarespace', 'webnode', 'jimdo', 'jimdofree', 'jimdosite', 'github', 'netlify', 'vercel', 'firebaseapp', 'herokuapp', 'site123', 'strikingly', 'godaddysites', 'mozello', 'webflow', 'carrd', 'google', 'one', 'onecom', 'domeneshop', 'proisp', 'altervista', 'tripod', 'yolasite', 'simplesite', 'hjemmeside']);
+
 /** True when a name ("Brunvoll", "Testselskap Alpha AS") is this company's legal name, legal form aside. */
 export function sameCompanyName(name: string, legalName: string): boolean {
   const a = nameTokens(name);
@@ -714,13 +717,19 @@ export function handleIsSiteBrand(handleRaw: string, verdict: SiteVerdict, legal
   if (verdict.status !== 'exact' || verdict.scoped) return false;
   const label = translit(verdict.candidate.domain.split('.')[0]).replace(/[^a-z0-9]/g, '');
   const tokens = nameTokens(legalName);
-  if (label.length < 4 || groupWordIn(label, tokens)) return false;
-  if (!(label.includes(tokens.join('')) || tokens.some((t) => t.length >= 4 && label.includes(t)))) return false;
-  if (handleRest(handleRaw, [label], 1) !== '') return false;
+  if (label.length < 4 || groupWordIn(label, tokens) || HOSTING_LABELS.has(label)) return false;
   const core = translit(handleRaw).replace(/[^a-z0-9]/g, '');
-  // A country arm, region or city unit ("Certego Norge AS" on certego.no): the bare brand's
-  // account is the parent's or the chain's, not this company's.
-  if (tokens.some((t) => SCOPE_TOKENS.has(t) && !core.includes(t))) return false;
+  const nameInLabel = label.includes(tokens.join('')) || tokens.some((t) => t.length >= 4 && label.includes(t)) || tokens.includes(label);
+  if (nameInLabel) {
+    if (handleRest(handleRaw, [label], 1) !== '') return false;
+    // A country arm, region or city unit ("Certego Norge AS" on certego.no): the bare brand's
+    // account is the parent's or the chain's, not this company's.
+    if (tokens.some((t) => SCOPE_TOKENS.has(t) && !core.includes(t))) return false;
+  } else if (core !== label) {
+    // The site's own short name that is not a word of the legal name ("ikskole" on ikskole.no for
+    // Indre Kåfjord barne- og ungdomsskole, hand check): only the exact same handle counts.
+    return false;
+  }
   // The site says it is part of a group, or names a company that carries the brand ("Treteam AS",
   // "Treteam Holding AS"): the brand's account may well be that company's.
   if (verdict.pages.some((p) => GROUP_PHRASES.test(p.text))) return false;
@@ -835,8 +844,8 @@ const DATE_TEXT = /(20\d\d-\d\d-\d\d)|(?<!\d)\d{1,2}\.\d{1,2}\.20\d\d(?!\d)|(?<!
 
 const NEWS_PATH = /\/(nyheter|nyhet|aktuelt|news|nytt|blogg|blog|presse|pressemeldinger|artikler|articles|insights|innsikt|siste-nytt)(\/|$)/i;
 const NEWS_TEXT = /^(nyheter|aktuelt|news|nytt|blogg|blog|presse|artikler|siste nytt|insights|innsikt)$/i;
-const CAREERS_PATH = /\/(karriere|karrierer|jobb|jobbe-hos-oss|jobb-hos-oss|ledige-stillinger|stillinger|careers?|jobs|work-with-us|join-us|bli-en-av-oss|rekruttering)(\/|$)/i;
-const CAREERS_TEXT = /^(karriere|jobb hos oss|jobbe hos oss|ledige stillinger|stillinger|careers?|jobs|jobb|bli en av oss|work with us|join us|rekruttering)$/i;
+const CAREERS_PATH = /\/(karriere|karrierer|jobb|jobbe-hos-oss|jobb-hos-oss|ledige-stillinger|ledig-stilling|stillinger|careers?|jobs|work-with-us|join-us|bli-en-av-oss|rekruttering)(\/|$)/i;
+const CAREERS_TEXT = /^(karriere|jobb hos oss|jobbe hos oss|ledige stillinger|ledig stilling|stillinger|careers?|jobs|jobb|bli en av oss|work with us|join us|rekruttering)$/i;
 const GENERIC_LINK = /^(les mer|les hele|se mer|mer|søk|søk her|søk nå|se stilling|se alle|vis alle|apply|apply now|read more|her|klikk her|ledige stillinger|karriere|jobb|nyheter|aktuelt|news|blogg|forrige|neste|next|previous)$/i;
 // Menu and paging labels on news pages ("Se flere nyheter", "Alle artikler", "Nyhetsarkiv"): not posts.
 // The sample post a new site comes with (WordPress's "Hello world!" in its usual languages, and the
@@ -1187,6 +1196,67 @@ function liveAdPage(page: WebPage, requested: string, title: string | null): boo
  * ad gives one, otherwise by its legal name). Ads for the parent or a sister company, open
  * applications and expired or undated postings are not openings of this company.
  */
+const AD_FIELDS = /(stillingsprosent|ansettelsesform|stillingstittel|stillingstype|tiltredelse|arbeidssted|arbeidstid|antall stillinger|send (din )?s[oø]knad|s[oø]knad og cv)/i;
+const AGENCY_AD = /(for (en )?kunde|v[aå]r(e)? kunde|p[aå] vegne av|for oppdragsgiver|arbeidsgiver\s*:|oppdragsgiver\s*:)/i;
+const MONTH_NUM: Record<string, number> = { januar: 1, jan: 1, februar: 2, feb: 2, mars: 3, mar: 3, april: 4, apr: 4, mai: 5, juni: 6, jun: 6, juli: 7, jul: 7, august: 8, aug: 8, september: 9, sept: 9, sep: 9, oktober: 10, okt: 10, november: 11, nov: 11, desember: 12, des: 12 };
+
+/**
+ * The application deadline a job ad gives ("Søknadsfrist: 13/11", "Søknadsfrist: 13.11.2026",
+ * "Søknadsfrist 1. desember"), as an ISO date. Without a year it is this year's date, or next
+ * year's when that is more than half a year behind `today` (a January deadline read in December).
+ * "Snarest" and "løpende" give no date.
+ */
+export function adDeadline(text: string, today: string): string | null {
+  const t = text.replace(/\u00a0/g, ' ');
+  let d: number, m: number, y: number | null = null;
+  const num = t.match(/s[oø]knadsfrist\s*(?:er\s*)?:?\s*(?:innen\s+)?(\d{1,2})\s*[./]\s*(\d{1,2})(?:\s*[./]\s*(\d{2,4}))?/i);
+  const word = t.match(/s[oø]knadsfrist\s*(?:er\s*)?:?\s*(?:innen\s+)?(\d{1,2})\.?\s+(januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|aug|sept|sep|okt|nov|des)\.?(?:\s+(\d{4}))?/i);
+  if (num) {
+    d = Number(num[1]);
+    m = Number(num[2]);
+    if (num[3]) y = num[3].length === 2 ? 2000 + Number(num[3]) : Number(num[3]);
+  } else if (word) {
+    d = Number(word[1]);
+    m = MONTH_NUM[word[2].toLowerCase()];
+    if (word[3]) y = Number(word[3]);
+  } else return null;
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+  const iso = (yy: number) => `${yy}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  if (y !== null) return iso(y);
+  const thisYear = Number(today.slice(0, 4));
+  const guess = iso(thisYear);
+  return Date.parse(today) - Date.parse(guess) > 183 * 864e5 ? iso(thisYear + 1) : guess;
+}
+
+/**
+ * A careers page that is itself one job ad (hand check: fod.no/ledig-stilling, "FOD søker
+ * deltidsmedarbeider til kattehuset og kennelen"): exactly one heading saying who is hiring for
+ * what, where the one hiring is this company ("Vi", its name or its site's name), job-ad details
+ * (position size, type of employment, how to apply), and an application deadline that has not
+ * passed. A page that says it is closed or has no openings, a staffing agency's ad for a client,
+ * an open application and a page with several such headings are not.
+ */
+export function careersPageAd(html: string, text: string, legalName: string, domain: string, today: string): { title: string; deadline: string } | null {
+  if (!/s[oø]knadsfrist/i.test(text) || !AD_FIELDS.test(text)) return null;
+  if (CLOSED_AD.test(text) || saysNoOpenings(text) || AGENCY_AD.test(text)) return null;
+  const deadline = adDeadline(text, today);
+  if (!deadline || deadline < today) return null;
+  const heads = [...html.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)]
+    .map((h) => decodeEntities(h[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const hiring = [...new Set(heads.filter((h) => /(^|\s)(s[oø]ker|ansetter)(\s|$)/i.test(h)))];
+  if (hiring.length !== 1) return null;
+  const title = hiring[0];
+  if (title.length < 12 || title.length > 150 || OPEN_APPLICATION.test(title)) return null;
+  if (/^vi (s[oø]ker|ansetter)( deg| flere| nye)?( medarbeidere| kollegaer| folk)?\s*[!.]*$/i.test(title)) return null;
+  const subject = title.split(/(?:^|\s)(?:s[oø]ker|ansetter)(?:\s|$)/i)[0].trim();
+  const subj = translit(subject).replace(/[^a-z0-9]/g, '');
+  const label = translit(domain.split('.')[0]).replace(/[^a-z0-9]/g, '');
+  const tokens = nameTokens(legalName);
+  const ours = subj === 'vi' || (subj.length >= 2 && (subj === label || sameCompanyName(subject, legalName) || tokens.some((t) => t.length >= 3 && subj === t) || (tokens.join('').length >= 4 && subj.includes(tokens.join('')))));
+  return ours ? { title, deadline } : null;
+}
+
 /**
  * A posting is an opening at this company when its employer is this company and it is current:
  * not past its closing date, or (with no closing date) posted in the past 120 days. An ad that
@@ -1247,12 +1317,24 @@ export async function readSiteActivity(
   // its publish date; titles that are menu or paging labels are not posts.
   const seen = new Set<string>();
   const add = (date: string | null, title: string, url: string, via: string, snapshot: SourceSnapshot) => {
-    if (!date || date < sinceDay || date > today || seen.has(url)) return;
+    if (!date || seen.has(url)) return;
     // A post address that carries its own date (/2026/03/27/...) must agree with the date found
     // (a day apart allowed for time zones): a card's other date, such as an event's, is not when
-    // the post was published.
+    // the post was published. A WordPress date address at the root of the site (/2026/03/27/slug/)
+    // is the publish date itself, so the post is dated by it (hand check: treteam.no's
+    // "Påskeferie 2026", whose card shows the holiday's last day); anywhere else it is left out.
     const inUrl = url.match(/\/(20\d\d)\/([01]\d)\/([0-3]\d)\//);
-    if (inUrl && Math.abs(Date.parse(`${inUrl[1]}-${inUrl[2]}-${inUrl[3]}`) - Date.parse(date)) > 864e5) return;
+    if (inUrl && Math.abs(Date.parse(`${inUrl[1]}-${inUrl[2]}-${inUrl[3]}`) - Date.parse(date)) > 864e5) {
+      let path = '';
+      try {
+        path = new URL(url).pathname;
+      } catch {
+        return;
+      }
+      if (!/^\/20\d\d\/[01]\d\/[0-3]\d\/[^/]+\/?$/.test(path)) return;
+      date = `${inUrl[1]}-${inUrl[2]}-${inUrl[3]}`;
+    }
+    if (date < sinceDay || date > today) return;
     const t = title.replace(/[\s\u00a0]+/g, ' ').replace(/^[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+|[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+$/g, '').trim();
     if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t) || NEWS_NAV_LABEL.test(t)) return;
     if (PLACEHOLDER_POST.test(t) || PLACEHOLDER_POST_URL.test(url)) return;
@@ -1505,6 +1587,11 @@ export async function readSiteActivity(
         }
         if (!employer || !jobTitle || jobTitle.length < 3 || jobTitle.length > 150 || GENERIC_LINK.test(jobTitle) || OPEN_APPLICATION.test(jobTitle)) continue;
         push({ title: jobTitle, posted: null, expires: null, url: ad.page.url, org: employer, orgIds: [] }, ad.page.url, ad.page.snapshot, 'job ad linked from the careers page (employer named in the ad title)');
+      }
+      // 3. No single ad found: the careers page may itself be one job ad, written on the page.
+      if (!act.jobs.length) {
+        const own = careersPageAd(r.page.html, analyzePage(r.page).text.slice(0, 40_000), id.legalName, domain, new Date().toISOString().slice(0, 10));
+        if (own) push({ title: own.title, posted: null, expires: own.deadline, url: r.page.url, org: id.legalName, orgIds: [] }, r.page.url, r.page.snapshot, 'job ad written on its careers page itself');
       }
       act.jobs = act.jobs.slice(0, 15);
     }

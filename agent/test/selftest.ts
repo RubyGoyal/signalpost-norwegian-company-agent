@@ -8,7 +8,7 @@ import { sameRegistryEvent, utcDay } from '../extract.ts';
 import { parseInputText } from '../input.ts';
 import { qualityReport } from '../quality.ts';
 import { checkUrlShape, isPublicAddress, parseRobots, robotsAllows } from '../web.ts';
-import { PLACEHOLDER_POST, feedItems, findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, profilesFrom, publishedDate, sameCompanyName, saysNoOpenings } from '../website.ts';
+import { PLACEHOLDER_POST, adDeadline, careersPageAd, feedItems, findOrgnrs, handleIsSiteBrand, handleMatchesName, normalizeSocial, otherEntities, profilesFrom, publishedDate, sameCompanyName, saysNoOpenings } from '../website.ts';
 import type { Envelope } from '../types.ts';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
@@ -185,7 +185,7 @@ const wrun = (name: string, env: Record<string, string> = {}) => {
 };
 const w1 = wrun('web1');
 const wq = JSON.parse(readFileSync(path.join(work, 'web1', 'run-report.json'), 'utf8')).quality;
-check(wq.all_checks_passed === true && wq.from_company_websites.dated_news_posts_from_feeds >= 2 && wq.from_company_websites.job_ads === 6 && wq.websites.not_published_by_reason['not_available:registered_website_belongs_to_another_entity'] === 1 && wq.websites.published_by_how_verified.registered_and_verified_on_site >= 1, `run report: quality section counts website results and passes on the website fixtures (got ${JSON.stringify(wq).slice(0, 400)})`);
+check(wq.all_checks_passed === true && wq.from_company_websites.dated_news_posts_from_feeds >= 2 && wq.from_company_websites.job_ads === 7 && wq.websites.not_published_by_reason['not_available:registered_website_belongs_to_another_entity'] === 1 && wq.websites.published_by_how_verified.registered_and_verified_on_site >= 1, `run report: quality section counts website results and passes on the website fixtures (got ${JSON.stringify(wq).slice(0, 400)})`);
 const wa = (o: string) => by(w1, o).availability;
 const wc = (o: string, f: string) => by(w1, o).claims.filter((c) => c.field === f);
 const aSite = wc('910000063', 'website')[0];
@@ -267,10 +267,11 @@ check(wa('910001000').official_website.state === 'available' && wc('910001000', 
 check(wa('910001019').official_website.state === 'available' && wc('910001019', 'email').some((c) => c.value === 'post@xi-test.no'), 'live check: a front page that redirects deeper on the same site is still the whole site (its contacts are used)');
 check(wc('910000977', 'website')[0]?.confidence === 0.8 && wa('910000977').official_website.state === 'available' && wa('910000985').official_website.state === 'blocked' && !wc('910000985', 'website').length, 'audit: a registered site behind bot protection is kept only when its domain carries the company name');
 check(!wc('910000896', 'site_news').length && wa('910000896').official_website.state === 'available', 'audit: a web shop\'s "Nyheter" (new products) is not read as news');
-check(wc('910000993', 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).join('|') === '2026-09-12 Nytt kontor i Arendal', `news (Builderr feedback): a dated post shown on the homepage is read when the site has no news page; an undated card, a service page and a card whose date disagrees with the date in its own address (live check: treteam.no) are not (got ${wc('910000993', 'site_news').map((c) => (c.value as any).title).join('|')})`);
+check(wc('910000993', 'site_news').map((c) => `${(c.value as any).date} ${(c.value as any).title}`).sort().join('|') === '2026-03-27 Påskeferie 2026 for kontoret|2026-09-12 Nytt kontor i Arendal', `news (Builderr feedback, hand check): a dated post shown on the homepage is read when the site has no news page; an undated card and a service page are not; a card whose date disagrees with the WordPress date in its own address (treteam.no) is dated by the address (got ${wc('910000993', 'site_news').map((c) => (c.value as any).date + ' ' + (c.value as any).title).join('|')})`);
 check(wc('910000993', 'site_job').map((c) => `${(c.value as any).title} | ${(c.value as any).url}`).sort().join() === 'Rekrutteringskonsulent | https://emp.jobylon.com/jobs/50001-sigma-personal-rekrutteringskonsulent/,Selger | https://emp.jobylon.com/jobs/50003-sigma-personal-selger/' && by(w1, '910000993').evidence.some((e) => e.source_url.startsWith('https://emp.jobylon.com/jobs/50001')), `jobs (hand check: homely.no): single ads behind a careers page's link to the company's Jobylon list are read through the list's embed script; a client's ad on the list is left out (got ${wc('910000993', 'site_job').map((c) => (c.value as any).title).join('|')})`);
 check(wc('910000993', 'site_job').some((c) => (c.value as any).title === 'Selger' && (c.value as any).posted === '2024-02-28') && !wc('910000993', 'site_job').some((c) => (c.value as any).title === 'Lagermedarbeider'), "jobs (QA run, homely.no): an old \"apply as soon as possible\" ad that the employer's live Jobylon list still carries is an opening; one whose page says it is closed is not");
 check(['Hello world!', 'Hei, verden!', 'Hallo verden', 'Hej världen!', 'Velkommen til bloggen min'].every((t) => PLACEHOLDER_POST.test(t)) && !['Hei, verden! Vi har åpnet nytt kontor', 'Our first post-pandemic fair', 'Nytt kontor i Arendal'].some((t) => PLACEHOLDER_POST.test(t)), 'news (live run on 1,000 companies): a new site\'s sample post ("Hei, verden!", "Hello world!") is not news');
+check(wc('910001000', 'site_job').map((c) => `${(c.value as any).title} | ${(c.value as any).url} | ${(c.value as any).expires}`).join() === 'Idehuset søker deltidsmedarbeider til galleriet | https://www.idehuset.no/ledig-stilling/ | 2099-11-13' && wc('910001000', 'site_job')[0]?.evidence_ids.length === 1, `jobs (hand check: fod.no): a careers page written as one job ad is published as that opening, with its deadline (got ${wc('910001000', 'site_job').map((c) => JSON.stringify(c.value)).join()})`);
 check(wc('910001000', 'site_news').map((c) => (c.value as any).title).join() === 'Ny utstilling i Skien' && by(w1, '910001000').evidence.some((e) => e.source_url === 'https://www.idehuset.no/feed/'), 'news (Builderr feedback): a feed the site does not declare is read at the standard WordPress address');
 const aW3 = by(w3, '910000063');
 check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news'), 'website down: no false removals of site news or job ads');
@@ -294,6 +295,32 @@ check(otherEntities([{ title: 'Kappa Gruppen', text: 'Kappa Gruppen består av K
 const brandVerdict = (title: string, text: string, scoped = false) => ({ status: 'exact', scoped, candidate: { domain: 'treteam.no' }, pages: [{ title, text, links: [], sameAs: [] }] }) as any;
 check(handleIsSiteBrand('treteam', brandVerdict('Tre Team', 'Tre Team Entreprenør AS bygger hus.'), 'TRE TEAM ENTREPRENØR AS') && !handleIsSiteBrand('treteam', brandVerdict('Tre Team', 'Tre Team Entreprenør AS er eid av Treteam AS.'), 'TRE TEAM ENTREPRENØR AS') && !handleIsSiteBrand('treteam', brandVerdict('Tre Team', 'Tre Team Entreprenør AS', true), 'TRE TEAM ENTREPRENØR AS'), "helpers: a handle equal to the company's own domain is its brand, unless another company on the site has that name or the site is someone else's");
 check(handleMatchesName('fod-foreningen-for-omplassering-av-dyr', 'FORENINGEN FOR OMPLASSERING AV DYR FOD'), 'helpers: small words of the legal name ("for", "av") allowed in a handle');
+const shortDomain = (domain: string) => ({ status: 'exact', scoped: false, candidate: { domain }, pages: [{ title: 'Indre Kåfjord barne- og ungdomsskole', text: 'Indre Kåfjord barne- og ungdomsskole', links: [], sameAs: [] }] }) as any;
+check(handleIsSiteBrand('ikskole', shortDomain('ikskole.no'), 'INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE') && !handleIsSiteBrand('ikskolen', shortDomain('ikskole.no'), 'INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE') && !handleIsSiteBrand('ikskoleoslo', shortDomain('ikskole.no'), 'INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE') && !handleIsSiteBrand('wixsite', shortDomain('wixsite.com'), 'INDRE KÅFJORD BARNE- OG UNGDOMSSKOLE'), "profiles (hand check: ikskole.no): an account named exactly after the site's own short domain is the company's, even when that name is not a word of its legal name; a longer handle or a site builder's name is not");
+check(
+  adDeadline('Søknadsfrist: 13/11. Intervjuer holdes fortløpende.', '2026-11-03') === '2026-11-13' &&
+    adDeadline('Søknadsfrist: 13.11.2026', '2026-11-03') === '2026-11-13' &&
+    adDeadline('Søknadsfrist 1. desember', '2026-11-03') === '2026-12-01' &&
+    adDeadline('Søknadsfrist: 05.01', '2026-12-20') === '2027-01-05' &&
+    adDeadline('Søknadsfrist: snarest', '2026-11-03') === null,
+  'jobs (hand check): an application deadline read with or without its year ("13/11", "1. desember"); "snarest" gives none'
+);
+const fodHtml = (h2: string, extra = '') => `<h1>Ledig stilling</h1><h2>${h2}</h2>${extra}`;
+const fodText = (h2: string, rest = 'Stillingsprosent: 30-50%. Ansettelsesform: fast stilling. Søknadsfrist: 13/11. Send søknad og CV til leder@fod.no.') => `Ledig stilling ${h2} Vi søker en engasjert medarbeider. ${rest}`;
+const FOD = 'FORENINGEN FOR OMPLASSERING AV DYR FOD';
+const t1 = 'FOD søker deltidsmedarbeider til kattehuset og kennelen';
+check(
+  careersPageAd(fodHtml(t1), fodText(t1), FOD, 'fod.no', '2026-11-03')?.title === t1 &&
+    careersPageAd(fodHtml(t1), fodText(t1), FOD, 'fod.no', '2026-11-03')?.deadline === '2026-11-13' &&
+    careersPageAd(fodHtml(t1), fodText(t1), FOD, 'fod.no', '2026-11-20') === null &&
+    careersPageAd(fodHtml('Kunde AS søker sveiser til verkstedet'), fodText('Kunde AS søker sveiser til verkstedet'), FOD, 'fod.no', '2026-11-03') === null &&
+    careersPageAd(fodHtml('Vi søker sveiser til vår kunde i Skien'), fodText('Vi søker sveiser til vår kunde i Skien'), FOD, 'fod.no', '2026-11-03') === null &&
+    careersPageAd(fodHtml(t1, '<h2>FOD søker hundetrener</h2>'), fodText(t1), FOD, 'fod.no', '2026-11-03') === null &&
+    careersPageAd(fodHtml('Vi søker deg!'), fodText('Vi søker deg!'), FOD, 'fod.no', '2026-11-03') === null &&
+    careersPageAd(fodHtml(t1), fodText(t1, 'Stillingen er ikke lenger ledig. Søknadsfrist: 13/11. Stillingsprosent: 50%.'), FOD, 'fod.no', '2026-11-03') === null &&
+    careersPageAd(fodHtml(t1), `Ledig stilling ${t1} Vi har mye å gjøre.`, FOD, 'fod.no', '2026-11-03') === null,
+  "jobs (hand check: fod.no): a careers page that is itself one job ad by this company, with a deadline that has not passed, is an opening; a passed deadline, another company's or a client's ad, several ads, a generic heading, a closed ad or a page without ad details is not"
+);
 // Builderr feedback: a parent group's account is not the company's own.
 const certego = (links: { url: string; text: string }[], text = 'Certego Norge AS leverer sikkerhet. Org.nr 910 000 063') => ({ status: 'exact', scoped: false, candidate: { domain: 'certego.no' }, pages: [{ title: 'Certego', text, links, sameAs: [], mailto: [], tel: [] }] }) as any;
 check(profilesFrom(certego([{ url: 'https://www.facebook.com/certego', text: '' }, { url: 'https://www.facebook.com/certegonorge', text: '' }]), 'CERTEGO NORGE AS').map((x) => x.profile.url).join() === 'https://facebook.com/certegonorge', "profiles (Builderr feedback): for a country arm (Certego Norge AS on certego.no) the bare brand's account (the group's) is left out; its own Norwegian account is kept");

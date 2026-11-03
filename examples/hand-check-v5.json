@@ -710,5 +710,11 @@
    "ruby_note": "no specific open position was listed",
    "claude": "right"
   }
- ]
+ ],
+ "fixed_after_hand_check": [
+  "A careers page that is itself one job ad (FOD's new part-time opening) is now published as that opening, with its deadline.",
+  "An account named exactly after the site's own short domain (Facebook \"ikskole\" on ikskole.no) is now the company's.",
+  "A news post dated only by its WordPress address (\"Påskeferie 2026\", treteam.no/2026/03/27/...) is now dated by the address instead of left out."
+ ],
+ "left_out_on_purpose": "Handles with a place word the legal name does not carry (fodoslo, InventuraBergenOslo), the bare brand of a regional unit (Personaltjenester for Personaltjenester Telemark AS), a brand that another company named on the site carries (treteam, floyaoffisiell), and open applications: these follow the rules Builderr asked for (the exact company, live openings only)."
 }

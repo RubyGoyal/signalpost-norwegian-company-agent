@@ -584,7 +584,12 @@ Object.assign(WEB, {
   // A WordPress site that does not declare its feed: read at the standard address.
   'www.idehuset.no': {
     pages: {
-      '/': page('Idehuset - Home', '<p>Velkommen.</p>'),
+      '/': page('Idehuset - Home', '<p>Velkommen.</p><nav><a href="/ledig-stilling/">Ledig stilling</a></nav>'),
+      // Hand check (fod.no/ledig-stilling): the careers page is itself one job ad.
+      '/ledig-stilling/': page(
+        'Ledig stilling - Idehuset',
+        '<h1>Ledig stilling</h1><h2>Idehuset søker deltidsmedarbeider til galleriet</h2><p>Vi søker en engasjert medarbeider.</p><p><strong>Praktisk informasjon</strong><br>Stillingsprosent: 40 %<br>Ansettelsesform: fast stilling<br>Søknadsfrist: 13.11.2099. Send søknad og CV til daglig leder.</p>'
+      ),
       '/feed/': {
         type: 'application/rss+xml; charset=UTF-8',
         feed: '<rss><channel><title>Idehuset</title><item><title>Ny utstilling i Skien</title><link>https://www.idehuset.no/2026/09/ny-utstilling/</link><pubDate>Thu, 03 Sep 2026 08:00:00 +0000</pubDate></item><item><title>Hei, verden!</title><link>https://www.idehuset.no/2026/08/hei-verden/</link><pubDate>Mon, 10 Aug 2026 08:00:00 +0000</pubDate></item></channel></rss>',
