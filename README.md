@@ -11,7 +11,7 @@ Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/sig
 | Run it | `npm ci`, then `npx tsx agent/run.ts <input-file> out` (Node.js 22.12 or later). No AI model, no API keys, $0 per run. |
 | Try it without installing | Live demo: [signalpost-g4p5.onrender.com](https://signalpost-g4p5.onrender.com). It runs on a free plan, so the first page after a pause can take up to a minute. |
 | Full live run, 1,000 companies | The official command on GitHub's servers (3 November 2026, commit `0788c6e`): 1,000 of 1,000 envelopes `available`, 60,262 facts each with its evidence, all quality checks passed, 314 seconds. An immediate re-run flagged 1 change: a slow site found the second time. It can be repeated from the Actions tab ("Full live run"), in this repository or in a fork. |
-| Accuracy | Claude's item-by-item cross-check of 52 published website items: 49 right, 2 wrong (both fixed), 1 can't tell. A hand check of the same items by a person is in progress. |
+| Accuracy | A hand check by a person of 52 published website items: of the 43 she could judge, 40 right (every website, social account and news post), 3 wrong (job decisions: one since fixed, one page changed after the run, one open-application list). Claude's separate cross-check of the same items: 49 right, 2 wrong (both fixed), 1 can't tell. The two checks agree on 40 of the 42 items both judged. |
 | Live QA | An outside QA agent (Momentic) tested the live demo and found 10 issues, all fixed. Its second run confirmed 9 of them; the tenth only shows when a source changes, and an offline test covers it. |
 | Offline tests | 151 checks: `npm run check:signalpost` |
 
@@ -31,7 +31,7 @@ Builderr's feedback on the latest run named three fixes and one way to go furthe
 - News: FOD's 10 posts came from its news page's feed at the standard WordPress address, which the site does not declare.
 - Two news errors were found and fixed: a web shop's product feed read as news (lappeliten.no), and a homepage card dated by the day an office reopens instead of its publish date (treteam.no).
 - Claude cross-checked a sample of 16 of these companies item by item: 49 of 52 items right. It found two more errors, both fixed: a sole proprietor's personal Instagram account published as the firm's (helleland.one), and Homely's live job ads missed because its Jobylon list is filled in by a script.
-- The same sample is being checked by hand by a person (see "Hand check" under Tests).
+- The same sample was then checked by hand by a person: every website, social account and news post she could judge is right; 3 of 6 job decisions were wrong (see "Hand check" under Tests).
 - A full live run of the official command on 1,000 companies, on GitHub's servers, found three more problems on real sites, all fixed: a new site's "Hei, verden!" sample post read as news, a site that did not answer on a re-run reported as removed, and job ads reported as closed when the job list could not be read in time. On the third run, an immediate re-run flagged 1 change, down from 14 and 22 (see "Full live run on GitHub" under Tests).
 - An outside QA agent tested the deployed web app end to end and found 10 issues (wording, a date shift on re-check, a citation, three older live ads, a broken link, phone layouts). All are fixed, and a second run on the fixed version confirmed 9 of them live; the tenth shows only when a source changes and is covered by an offline test (see "QA run on the live demo" under Tests).
 
@@ -219,7 +219,23 @@ Details of that test are in [`examples/live-test-v3-report.json`](examples/live-
 
 Details are in [`examples/live-test-v5-report.json`](examples/live-test-v5-report.json).
 
-**Hand check:** a sample of the version 5 output is being checked by a person, not a model: 16 of the companies above (12 drawn at random, and 4 whose careers pages the agent read). For each website, social account, news post and job decision she opens the source and marks it right or wrong; accuracy by source type will be reported here. To draw such a sample from any run: `npx tsx scripts/handcheck-sample.ts out/envelopes.jsonl handcheck-sample.json 15`.
+**Hand check by a person (3 November 2026):** Ruby Goyal checked a sample of the version 5 output herself, opening each source, without the agent's code or Claude's verdicts: 16 of the companies above (12 drawn at random, and 4 whose careers pages the agent read), 52 items in all.
+
+| Source | Items | Right | Wrong | Can't tell | Right, of those judged |
+|---|---|---|---|---|---|
+| Site | 16 | 16 | 0 | 0 | 100% |
+| Social | 11 | 9 | 0 | 2 | 100% |
+| News | 18 | 12 | 0 | 6 | 100% |
+| Jobs | 7 | 3 | 3 | 1 | 50% |
+| All | 52 | 40 | 3 | 9 | 93% |
+
+- Every website, every social account she could open and every news post she could date is right.
+- Jobs, wrong: Homely's live ads behind its Jobylon list were missed (fixed since; all 6 are now published). FOD's careers page said "Vi har for tiden ingen ledige stillinger" on 1 and 2 November and showed a new part-time opening on 3 November, so the page changed after the run. Inventura's job list, loaded by a script from Workable, holds five "Åpen søknad" open applications and a staffing-pool posting: the agent does not count open applications as openings.
+- Can't tell: two Instagram accounts behind a login (one, a sole proprietor's private account, was found wrong by Claude's cross-check and is no longer published); six news posts whose page shows no date (Homely, Tre Team), dated in the page's metadata, the site's feed and the post's address, where Claude's cross-check and the QA run confirmed them; and Hapro's job list, which did not display.
+- Agreement with Claude's cross-check (below): the two checks gave the same verdict on 40 of the 42 items both judged; the two that differ are FOD (the page changed in between) and Inventura (open applications).
+- Missed, from her notes: accounts left out by the rules for this exact company (handles with a place word such as "fodoslo", the bare brand of a regional unit, a brand that another company on the site carries), an account named after the site's short domain ("ikskole"), and one news post dated only by its address ("Påskeferie 2026" on treteam.no).
+
+Every mark, with her notes and Claude's verdict for the same item, is in [`examples/hand-check-v5.json`](examples/hand-check-v5.json). To draw such a sample from any run: `npx tsx scripts/handcheck-sample.ts out/envelopes.jsonl handcheck-sample.json 15`.
 
 **Cross-check by Claude (2 November 2026):** the same 52 items were also checked by Claude, opening each source and reading it as a person would, without the agent's code. This is a model's check, kept separate from the hand check above.
 
