@@ -4,6 +4,17 @@ Signalpost takes Norwegian organisation numbers and returns one result envelope 
 
 Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/signalpost).
 
+## For reviewers
+
+| | |
+|---|---|
+| Run it | `npm ci`, then `npx tsx agent/run.ts <input-file> out` (Node.js 22.12 or later). No AI model, no API keys, $0 per run. |
+| Try it without installing | Live demo: [signalpost-g4p5.onrender.com](https://signalpost-g4p5.onrender.com). It runs on a free plan, so the first page after a pause can take up to a minute. |
+| Full live run, 1,000 companies | The official command on GitHub's servers (3 November 2026, commit `0788c6e`): 1,000 of 1,000 envelopes `available`, 60,262 facts each with its evidence, all quality checks passed, 314 seconds. An immediate re-run flagged 1 change: a slow site found the second time. It can be repeated from the Actions tab ("Full live run"), in this repository or in a fork. |
+| Accuracy | Claude's item-by-item cross-check of 52 published website items: 49 right, 2 wrong (both fixed), 1 can't tell. A hand check of the same items by a person is in progress. |
+| Live QA | An outside QA agent (Momentic) tested the live demo and found 10 issues, all fixed. Its second run confirmed 9 of them; the tenth only shows when a source changes, and an offline test covers it. |
+| Offline tests | 151 checks: `npm run check:signalpost` |
+
 ## What's new in version 5
 
 Builderr's feedback on the latest run named three fixes and one way to go further. Each is now a rule in the agent and an offline test.
@@ -21,6 +32,7 @@ Builderr's feedback on the latest run named three fixes and one way to go furthe
 - Two news errors were found and fixed: a web shop's product feed read as news (lappeliten.no), and a homepage card dated by the day an office reopens instead of its publish date (treteam.no).
 - Claude cross-checked a sample of 16 of these companies item by item: 49 of 52 items right. It found two more errors, both fixed: a sole proprietor's personal Instagram account published as the firm's (helleland.one), and Homely's live job ads missed because its Jobylon list is filled in by a script.
 - The same sample is being checked by hand by a person (see "Hand check" under Tests).
+- A full live run of the official command on 1,000 companies, on GitHub's servers, found three more problems on real sites, all fixed: a new site's "Hei, verden!" sample post read as news, a site that did not answer on a re-run reported as removed, and job ads reported as closed when the job list could not be read in time. On the third run, an immediate re-run flagged 1 change, down from 14 and 22 (see "Full live run on GitHub" under Tests).
 - An outside QA agent tested the deployed web app end to end and found 10 issues (wording, a date shift on re-check, a citation, three older live ads, a broken link, phone layouts). All are fixed, and a second run on the fixed version confirmed 9 of them live; the tenth shows only when a source changes and is covered by an offline test (see "QA run on the live demo" under Tests).
 
 ## What's new in version 4
@@ -160,7 +172,7 @@ Optional flags and environment variables:
 - **Models:** none. No LLM or paid API is used; all sources are free public APIs.
 - **Third-party cost per official run:** $0.
 - **Caches:** no external cache. The only stored data is the local `.signalpost-state/` folder with each company's previous snapshot, used to detect changes on refresh. Delete it for a cold start.
-- **Expected runtime:** about 5 to 7 minutes for 1,000 companies. Registry research and the website step run in parallel with the NAV read. `--deadline-seconds` guarantees a complete file within any budget.
+- **Expected runtime:** about 5 minutes for 1,000 companies, website step included (314 seconds on a GitHub-hosted runner, 3 November 2026). Registry research and the website step run in parallel with the NAV read. `--deadline-seconds` guarantees a complete file within any budget.
 - **Secrets:** none required. NAV's job feed uses its published public token, fetched at run time from `https://pam-stilling-feed.nav.no/api/publicToken`; a NAV-issued token can be supplied instead with `SIGNALPOST_NAV_TOKEN`. No keys are stored or logged. `.env*` files are git-ignored.
 - **Dependencies:** pinned in `package-lock.json`, installed with `npm ci`. Runtime: `tsx` (MIT). Web app: `express`, `react`, `vite`, `tailwindcss`, `lucide-react` (MIT / ISC).
 
@@ -241,6 +253,23 @@ The first run also noted that a filter matching nothing showed an empty table (i
 
 **Full live run on GitHub:** the repository's Actions tab has a "Full live run" workflow, started by hand. On GitHub's servers it installs with `npm ci`, runs the offline checks, runs the official command on real companies (by default the 1,000 in `examples/smoke-1000.txt`), runs it again to check that an immediate re-run reports no false changes, and saves the envelopes, run reports and logs for download. The run's page shows a summary: states, runtime, requests, quality checks, coverage by kind of fact, and what came from company websites. `npx tsx scripts/run-summary.ts out` prints the same summary for any local run.
 
+Results of the three runs (2 and 3 November 2026; details in [`examples/full-run-v5-report.json`](examples/full-run-v5-report.json)):
+
+| | Run 1 (`ffcba6e`) | Run 2 (`a44e21b`) | Run 3 (`0788c6e`) |
+|---|---:|---:|---:|
+| Envelopes `available` | 1,000 of 1,000 | 1,000 of 1,000 | 1,000 of 1,000 |
+| Facts, all with evidence | 60,254 | 60,253 | 60,262 |
+| Quality checks | all passed | all passed | all passed |
+| Runtime | 312 s | 299 s | 314 s |
+| Requests (registry / NAV / websites) | 5,003 / 8,383 / 2,790 | 5,003 / 8,400 / 2,862 | 5,003 / 8,249 / 2,921 |
+| Website checks that could not finish | 36 | 32 | 14 |
+| Changes flagged by an immediate re-run | 14 | 22 | 1 |
+
+- Coverage in run 3, by companies: legal identity, status and group structure 100%; address, industry and roles 99.6%; annual accounts 99.9%; sub-units 75%; contact points 39.1%; employee count 14.8% (most small companies register none); verified or registered official website 12.6%; company-owned profiles 4.5% (81 accounts); dated news from the company's own site for 19 companies (114 posts); job ads for 4 companies.
+- Found and fixed between runs: a new site's "Hei, verden!" sample post read as news (run 1); a verified site that did not answer on the re-run reported as removed (run 1); Homely's 6 careers-page openings reported as closed on the re-run, because its job list could not be read in time (run 2). The website step's time budget per company also went from 20 to 30 seconds, which cut checks that ran out of time from 24 to 6.
+- The one change left in run 3 is a site that answered slowly the first time and was found on the re-run. That is a real addition, not a false change.
+- Run 1's re-run also dropped a registered website (clemenskraft.no) that the first pass could not read in time and kept as registered. The re-run read it: it shows a different company's organisation number, so dropping it was right.
+
 To smoke-test against the live registry on a random sample of real companies:
 
 ```bash
@@ -274,7 +303,9 @@ The offline self-test (151 checks) runs against simulated registry, NAV and comp
 
 ## Web app
 
-**Online, no install:** [deploy it on Render's free plan](https://render.com/deploy?repo=https://github.com/RubyGoyal/signalpost-norwegian-company-agent) (`render.yaml`). The build runs the agent on the 10 sample companies, so the Batch results page has data. A free service sleeps when unused, and its first page after a pause can take up to a minute.
+**Live demo:** [signalpost-g4p5.onrender.com](https://signalpost-g4p5.onrender.com) (free plan, so the first page after a pause can take up to a minute).
+
+**Online, no install, your own copy:** [deploy it on Render's free plan](https://render.com/deploy?repo=https://github.com/RubyGoyal/signalpost-norwegian-company-agent) (`render.yaml`). The build runs the agent on the 10 sample companies, so the Batch results page has data. A free service sleeps when unused, and its first page after a pause can take up to a minute.
 
 **On your own computer:**
 
