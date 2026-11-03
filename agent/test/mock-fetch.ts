@@ -595,7 +595,7 @@ Object.assign(WEB, {
       ),
       '/feed/': {
         type: 'application/rss+xml; charset=UTF-8',
-        feed: '<rss><channel><title>Idehuset</title><item><title>Ny utstilling i Skien</title><link>https://www.idehuset.no/2026/09/ny-utstilling/</link><pubDate>Thu, 03 Sep 2026 08:00:00 +0000</pubDate></item><item><title>Hei, verden!</title><link>https://www.idehuset.no/2026/08/hei-verden/</link><pubDate>Mon, 10 Aug 2026 08:00:00 +0000</pubDate></item></channel></rss>',
+        feed: '<rss><channel><title>Idehuset</title><item><title>Ny utstilling i Skien</title><link>https://www.idehuset.no/2026/09/ny-utstilling/</link><pubDate>Thu, 03 Sep 2026 08:00:00 +0000</pubDate></item><item><title>Hei, verden!</title><link>https://www.idehuset.no/2026/08/hei-verden/</link><pubDate>Mon, 10 Aug 2026 08:00:00 +0000</pubDate></item><item><title>Real Dealer Thrills Inside Live Casino by king johnnie real player review</title><link>https://www.idehuset.no/2026/07/real-dealer/</link><pubDate>Fri, 24 Jul 2026 08:00:00 +0000</pubDate></item><item><title>Una atmósfera nocturna que despierta el espíritu del jugador</title><link>https://www.idehuset.no/2026/07/una-atmosfera/</link><pubDate>Fri, 24 Jul 2026 09:00:00 +0000</pubDate></item></channel></rss>',
       },
     },
   },

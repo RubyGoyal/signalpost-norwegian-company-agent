@@ -228,6 +228,89 @@
     "Sites slow on the first visit and passing address-lookup failures were only retried by the re-run.",
     "Homely's six job ads were not all read within the time budget on the first pass (read one after another)."
    ]
+  },
+  {
+   "date": "2026-11-03",
+   "commit": "71ce6e94baa96c6e87fcb15daf8af51cf9b6c3aa",
+   "github_run": "https://github.com/RubyGoyal/signalpost-norwegian-company-agent/actions/runs/41600006890",
+   "envelopes": 1000,
+   "states": {
+    "available": 1000
+   },
+   "claims": 60261,
+   "quality_checks": "all passed",
+   "runtime_seconds": 360,
+   "per_company_ms": {
+    "p50": 6689,
+    "p95": 36651
+   },
+   "requests": {
+    "brreg": 5003,
+    "nav": 8289,
+    "company_websites": 3293
+   },
+   "cost_usd": 0,
+   "models": [],
+   "source_errors": {
+    "company_website": 16,
+    "regnskapsregisteret": 1
+   },
+   "website_checks_not_finished": 8,
+   "website_checks_not_finished_by_reason": {
+    "http_N": 4,
+    "dns_error": 4,
+    "website_time_budget_reached": 4,
+    "no_such_host": 2,
+    "timeout": 1,
+    "network_error: UND_ERR_CONNECT_TIMEOUT": 1
+   },
+   "companies_with_family_available": {
+    "legal_identity": 1000,
+    "registered_address": 996,
+    "industry": 996,
+    "employees": 148,
+    "status_flags": 1000,
+    "roles": 996,
+    "locations": 750,
+    "annual_accounts": 999,
+    "group_structure": 1000,
+    "public_activity": 1000,
+    "contact_points": 390,
+    "official_website": 126,
+    "company_profiles": 46,
+    "job_postings": 5
+   },
+   "from_company_websites": {
+    "verified_official_website": 113,
+    "social_profiles": 81,
+    "companies_with_social_profiles": 46,
+    "dated_news_posts": 114,
+    "companies_with_news": 19,
+    "news_posts_from_feeds": 103,
+    "careers_page_job_ads": 7,
+    "companies_with_careers_page_job_ads": 2
+   },
+   "companies_with_nav_job_ads": 3,
+   "nav_feed": {
+    "read": true,
+    "active_ads_indexed": 8170,
+    "feed_entries_read": 116812,
+    "detail_scan_complete": true
+   },
+   "rerun": {
+    "runtime_seconds": 318,
+    "changes": 15,
+    "by_kind": {
+     "new site_news": 10,
+     "new website": 2,
+     "new social_profile": 2,
+     "new phone": 1
+    },
+    "note": "No removals. Two sites (enklerekontor.no, masetech.no) were found only on the second visit; the first had gambling spam injected into its blog."
+   },
+   "found": [
+    "An office-supplies shop's blog carried injected gambling spam (Portuguese, Spanish and English casino posts) among its own posts."
+   ]
   }
  ],
  "fixed_between_runs": [
@@ -236,7 +319,8 @@
   "Careers-page job ads are reported as closed only when the careers page and every ad it leads to were read.",
   "The website step's time budget per company went from 20 to 30 seconds.",
   "A website check that ends without a verified site because of a passing failure (timeout, address lookup) gets a second look in the same run, with the failure forgotten.",
-  "Job ad pages behind a careers page are read four at a time."
+  "Job ad pages behind a careers page are read four at a time.",
+  "Gambling spam injected into a hacked blog is not news (added after run 5, offline tests)."
  ],
  "note_on_clemenskraft": "On runs 1 and 2 the re-run dropped the registered website www.clemenskraft.no (company 989728504). The first pass could not read it in time and kept it as registered, since its domain carries the company's name; the re-run read it, and it shows a different organisation number (912511480), so dropping it was right."
 }

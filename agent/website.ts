@@ -852,6 +852,10 @@ const GENERIC_LINK = /^(les mer|les hele|se mer|mer|søk|søk her|søk nå|se st
 // site builders' "first post" placeholders): it is not news from the company (live run on 1,000
 // companies: "Hei, verden!" on two fresh WordPress sites).
 export const PLACEHOLDER_POST = /^(hello,? world|hei,? verden|hallo,? verden|hej,? (verden|v[aä]rlden)|hallo,? welt|bonjour tout le monde|hola,? mundo|(this is )?(my|your|the) first (blog )?post|f[oø]rste (blogg)?innlegg|mitt f[oø]rste innlegg|velkommen til (min |v[aå]r )?blogg(en)?( min)?)\s*[!.]*$/i;
+// Gambling spam injected into a hacked blog (full live run: casino posts in Portuguese, Spanish and
+// English among an office-supplies shop's own posts). Not used for a company in gaming.
+export const SPAM_POST = /(^|[^\p{L}])(casino|cassino|casin[oò]|kasino|slots?|betting|bookmakers?|apostas?|apuestas?|poker|roulette|ruleta|blackjack|jackpots?|jugador(es)?|jogador(es)?|jogos?|juegos?|viagra|cialis|payday)(?=$|[^\p{L}])/iu;
+const GAMING_COMPANY = /(tipping|casino|kasino|poker|betting|bingo|lotteri|totalisator|spill)/i;
 export const PLACEHOLDER_POST_URL = /\/(hello-world|hei-verden|hallo-verden|hej-varlden|hej-verden|hallo-welt|hola-mundo|bonjour-tout-le-monde)\/?(?:[?#].*)?$/i;
 
 const NEWS_NAV_LABEL = new RegExp(
@@ -1338,6 +1342,7 @@ export async function readSiteActivity(
     const t = title.replace(/[\s\u00a0]+/g, ' ').replace(/^[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+|[\s\u203a\u00bb\u2192>\u00b7\u2022|-]+$/g, '').trim();
     if (t.length < 8 || t.length > 200 || GENERIC_LINK.test(t) || NEWS_NAV_LABEL.test(t)) return;
     if (PLACEHOLDER_POST.test(t) || PLACEHOLDER_POST_URL.test(url)) return;
+    if (SPAM_POST.test(t) && !GAMING_COMPANY.test(id.legalName)) return;
     seen.add(url);
     act.news.push({ date, title: t, url, snapshot, via });
   };
