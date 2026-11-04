@@ -13,7 +13,7 @@ Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/sig
 | Full live run, 1,000 companies | The official command on GitHub's servers, run five times while fixing what it found (latest: 3 November 2026, commit `71ce6e9`): 1,000 of 1,000 envelopes `available`, 60,261 facts each with its evidence, all quality checks passed, 360 seconds. An immediate re-run reported no false removals; its 15 changes are additions from sites that were slow on their first visit. It can be repeated from the Actions tab ("Full live run"), in this repository or in a fork. |
 | Accuracy | A hand check by a person of 52 published website items: of the 43 she could judge, 40 right (every website, social account and news post), 3 wrong (job decisions: one since fixed, one page changed after the run, one open-application list). Claude's separate cross-check of the same items: 49 right, 2 wrong (both fixed), 1 can't tell. The two checks agree on 40 of the 42 items both judged. |
 | Live QA | An outside QA agent (Momentic) tested the live demo and found 10 issues, all fixed. Its second run confirmed 9 of them; the tenth only shows when a source changes, and an offline test covers it. |
-| Offline tests | 157 checks: `npm run check:signalpost` |
+| Offline tests | 158 checks: `npm run check:signalpost` |
 
 ## What's new in version 5
 
@@ -295,7 +295,7 @@ npx tsx scripts/sample-batch.ts 100 examples/smoke-100.txt
 npx tsx agent/run.ts examples/smoke-100.txt out
 ```
 
-The offline self-test (157 checks) runs against simulated registry, NAV and company-website responses. It covers:
+The offline self-test (158 checks) runs against simulated registry, NAV and company-website responses. It covers:
 - one row per input, and a deadline close-out
 - failure handling with no invented values
 - unknown and deleted numbers, and an invalid checksum
@@ -334,6 +334,8 @@ npm run dev        # http://localhost:3000
 - **Look up:** any organisation number, with every fact linked to its source and a "Re-check registry" button that shows changes.
 - **Batch results:** browse `out/envelopes.jsonl` with filters, export, and side-by-side compare of up to three companies.
 - **How it works:** sources, rules and the current commit.
+
+**Data for other websites:** the "Site data" workflow runs the agent every day on the companies in `site/companies.txt` and publishes small JSON files (one list, one file per company, every fact with its source links) on the `site-data` branch, readable straight from a browser. The format is in [`site/README.md`](site/README.md).
 
 ## License
 

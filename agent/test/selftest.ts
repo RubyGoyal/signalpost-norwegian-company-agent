@@ -279,6 +279,22 @@ check(wc('910001000', 'site_news').map((c) => (c.value as any).title).join() ===
 const aW3 = by(w3, '910000063');
 check(!aW3.refresh.changes.some((c) => c.field === 'site_job' || c.field === 'site_news'), 'website down: no false removals of site news or job ads');
 
+// --- Website data (scripts/site-data.ts) --------------------------------------------------
+{
+  const siteDir = path.join(work, 'site');
+  execFileSync(process.execPath, ['--import', 'tsx', path.join(root, 'scripts/site-data.ts'), path.join(work, 'web1', 'envelopes.jsonl'), siteDir], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  const idx = JSON.parse(readFileSync(path.join(siteDir, 'index.json'), 'utf8'));
+  const files = idx.companies.map((r: any) => JSON.parse(readFileSync(path.join(siteDir, 'companies', `${r.orgnr}.json`), 'utf8')));
+  const facts = files.flatMap((f: any) => f.sections.flatMap((s: any) => s.facts));
+  const alpha = files.find((f: any) => f.orgnr === '910000063');
+  const beta = idx.companies.find((r: any) => r.orgnr === '910000098');
+  check(
+    idx.count === idx.companies.length && idx.count > 10 && facts.length > 100 && facts.every((f: any) => f.sources.length > 0 && f.sources.every((x: any) => /^https?:\/\//.test(x.url))) &&
+      alpha?.key_facts.length === 16 && alpha.key_facts.find((k: any) => k.key === 'revenue')?.value?.startsWith('NOK ') && alpha.summary[0]?.kind === 'glance' && beta?.employees === null,
+    `site data: one light list and one file per company; every fact has its source links, the compare facts are the same 16 for every company, and a missing employee count stays null (got ${idx.count} companies, ${facts.length} facts)`
+  );
+}
+
 // --- Quality checks catch a bad envelope ----------------------------------------------------
 const badEnv = JSON.parse(JSON.stringify(by(w1, '910000063'))) as Envelope;
 badEnv.claims[0].evidence_ids = ['ev:missing'];

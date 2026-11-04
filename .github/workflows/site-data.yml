@@ -1,0 +1,63 @@
+# Data for the Signalpost website: runs the agent on the companies in site/companies.txt, turns its
+# output into small JSON files (scripts/site-data.ts) and publishes them on the `site-data` branch:
+#   https://raw.githubusercontent.com/RubyGoyal/signalpost-norwegian-company-agent/site-data/index.json
+#   https://raw.githubusercontent.com/RubyGoyal/signalpost-norwegian-company-agent/site-data/companies/<orgnr>.json
+# It runs every day, so the site stays current. The previous run's snapshots are kept on the branch,
+# so each company's "changes since the last check" are real changes since the day before.
+name: Site data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Install (npm ci)
+        run: npm ci
+
+      - name: Restore the previous run's snapshots
+        run: |
+          if git fetch --depth 1 origin site-data 2>/dev/null; then
+            git worktree add previous FETCH_HEAD
+            if [ -d previous/state ]; then cp -r previous/state .signalpost-state; fi
+            git worktree remove --force previous
+          fi
+
+      - name: Run the agent (official command)
+        run: npx tsx agent/run.ts site/companies.txt out
+
+      - name: Build the site data
+        run: |
+          npx tsx scripts/site-data.ts out/envelopes.jsonl site-out
+          cp site/README.md site-out/README.md
+          cp out/run-report.json site-out/run-report.json
+          if [ -d .signalpost-state ]; then cp -r .signalpost-state site-out/state; fi
+
+      - name: Publish to the site-data branch
+        run: |
+          cd site-out
+          git init -q -b site-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Site data from ${GITHUB_SHA::7} ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" site-data
+          echo "Published $(jq .count index.json) companies." | tee -a "$GITHUB_STEP_SUMMARY"
