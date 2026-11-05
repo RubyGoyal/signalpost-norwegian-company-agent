@@ -260,10 +260,11 @@ function companyFile(e: Envelope) {
     key('chair', 'Board chair', role('LEDE')),
     key('auditor', 'Auditor', role('REVI')),
     key('website', 'Website', one('website')),
-    key('profiles', 'Social profiles', profiles[0], profiles.length ? `${profiles.length}: ${profiles.map((p) => PLATFORMS[(p.value as any).platform] || (p.value as any).platform).join(', ')}` : undefined),
-    key('jobs', 'Open job ads', jobs[0], jobs.length ? `${jobs.length}: ${display(jobs[0]).value}${jobs.length > 1 ? ' and more' : ''}` : undefined),
-    key('news', 'Latest news', news[0]),
-    key('sub_units', 'Sub-units', subUnits[0], subUnits.length ? String(subUnits.length) : undefined),
+    // Counts: "None found" reads better than "Not registered" for things a company simply has none of.
+    key('profiles', 'Social profiles', profiles[0], profiles.length ? `${profiles.length}: ${profiles.map((p) => PLATFORMS[(p.value as any).platform] || (p.value as any).platform).join(', ')}` : 'None found'),
+    key('jobs', 'Open job ads', jobs[0], jobs.length ? `${jobs.length}: ${display(jobs[0]).value}${jobs.length > 1 ? ' and more' : ''}` : 'None found'),
+    key('news', 'Latest news', news[0], news.length ? undefined : 'None found'),
+    key('sub_units', 'Sub-units', subUnits[0], subUnits.length ? String(subUnits.length) : 'None found'),
   ];
   const sections = FAMILIES.map(([fam, title]) => {
     const a = e.availability[fam];
