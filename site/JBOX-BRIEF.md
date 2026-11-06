@@ -14,7 +14,7 @@ DATA (read-only JSON, public, CORS-enabled; fetch it at runtime and cache it for
 - Format description: https://github.com/RubyGoyal/signalpost-norwegian-company-agent/blob/main/site/README.md
 - index.json: { generated_at, commit, count, companies: [{ orgnr, name, form, status, municipality, industry, employees, revenue: { amount, currency, year, display } | null, website, profiles, news, jobs, facts, glance }] }
 - companies/{orgnr}.json: { orgnr, name, form: { code, description }, status, checked_at, summary: [{ kind: "glance" | "new" | "fact" | "changes" | "unknowns", text, sources: [{ label, url }] }], key_facts: [{ key, label, value, link?, sources: [...] }], sections: [{ key, title, state: "found" | "none" | "unclear" | "failed", note, facts: [{ label, value, link?, as_of, period, sources: [{ label, url, retrieved_at, where }] }] }], changes: { since, baseline, items: [{ label, type, before, after }] }, sources_consulted: [{ label, url, retrieved_at, ok }], fact_count }
-- Values are already formatted for display: show them exactly as given. A null value means the register has none: show "Not registered", never 0 or a guess.
+- Values are already formatted for display: show them exactly as given. A null value means the source holds nothing: show "Not registered", never 0 or a guess. Some facts say "None found" themselves; show that text as it is.
 - key_facts has the same 16 facts in the same order for every company, made for the compare view.
 
 SCREENS
