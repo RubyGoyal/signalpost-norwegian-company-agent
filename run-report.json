@@ -1,0 +1,131 @@
+{
+  "run_id": "run-2026-11-07T11-03-53-240Z",
+  "started_at": "2026-11-07T11:03:53.240Z",
+  "completed_at": "2026-11-07T11:06:56.493Z",
+  "input_file": "site/companies.txt",
+  "input_count": 56,
+  "envelope_count": 56,
+  "one_envelope_per_input": true,
+  "skipped_input_lines": 2,
+  "duplicate_inputs_merged": 0,
+  "states": {
+    "available": 56
+  },
+  "companies_with_family_available": {
+    "legal_identity": 56,
+    "registered_address": 56,
+    "industry": 56,
+    "employees": 32,
+    "status_flags": 56,
+    "roles": 56,
+    "locations": 56,
+    "annual_accounts": 54,
+    "official_website": 56,
+    "company_profiles": 27,
+    "contact_points": 53,
+    "group_structure": 56,
+    "public_activity": 56,
+    "job_postings": 5
+  },
+  "official_website_outcomes": {
+    "available:registered_and_verified_on_site": 52,
+    "available:verified_on_site_via_name_domain_check": 1,
+    "available:verified_on_site_via_registered_email_domain": 1,
+    "available:registered_in_enhetsregisteret": 2
+  },
+  "quality": {
+    "all_checks_passed": true,
+    "issues": 0,
+    "checks": {
+      "claims_without_evidence": 0,
+      "evidence_without_source_url_time_or_hash": 0,
+      "duplicate_claim_ids": 0,
+      "website_facts_without_a_verified_website": 0,
+      "news_posts_without_publish_date": 0,
+      "website_job_ads_without_hiring_organisation": 0,
+      "summary_statements_citing_missing_evidence": 0,
+      "failed_envelopes_with_claims": 0
+    },
+    "claims_by_family": {
+      "legal_identity": 473,
+      "registered_address": 80,
+      "industry": 226,
+      "employees": 32,
+      "status_flags": 168,
+      "official_website": 56,
+      "annual_accounts": 2283,
+      "group_structure": 120,
+      "contact_points": 126,
+      "roles": 420,
+      "locations": 410,
+      "public_activity": 408,
+      "company_profiles": 60,
+      "job_postings": 18
+    },
+    "claims_by_source_class": {
+      "official_registry": 4704,
+      "company_owned": 218,
+      "official_job_board": 10
+    },
+    "websites": {
+      "published_by_how_verified": {
+        "registered_and_verified_on_site": 52,
+        "verified_on_site_via_name_domain_check": 1,
+        "verified_on_site_via_registered_email_domain": 1,
+        "registered_in_enhetsregisteret": 2
+      },
+      "not_published_by_reason": {}
+    },
+    "from_company_websites": {
+      "companies_with_verified_website": 54,
+      "social_profiles": 60,
+      "dated_news_posts": 71,
+      "dated_news_posts_from_feeds": 49,
+      "job_ads": 8,
+      "role_email_addresses": 16,
+      "main_phone_numbers": 9
+    }
+  },
+  "total_claims": 4880,
+  "refresh_changes_detected": 1,
+  "requests_total": 10108,
+  "requests_by_source": {
+    "brreg": 287,
+    "nav": 9397,
+    "company_websites": 424
+  },
+  "runtime_seconds": 183,
+  "per_company_runtime_ms": {
+    "p50": 7920,
+    "p95": 16106
+  },
+  "third_party_cost_usd": 0,
+  "models_used": [],
+  "sources": [
+    "data.brreg.no Enhetsregisteret (entities, roles, sub-units, update feed)",
+    "data.brreg.no Regnskapsregisteret",
+    "pam-stilling-feed.nav.no (NAV job vacancy feed)",
+    "company-owned websites (robots.txt honoured)"
+  ],
+  "company_websites": {
+    "checked": true,
+    "disabled_reason": null
+  },
+  "nav_job_feed": {
+    "ok": true,
+    "token": "public",
+    "window_days": 60,
+    "feed_pages": 120,
+    "entries_read": 118682,
+    "active_ads": 9276,
+    "window_from": "2026-09-08T11:03:53.996Z",
+    "window_to": "2026-11-07T11:14:40.370756+01:00",
+    "retrieved_at": "2026-11-07T11:03:53.996Z",
+    "first_page_url": "https://pam-stilling-feed.nav.no/api/v1/feed",
+    "details_total": 9276,
+    "details_scanned": 9276,
+    "detail_errors": 0,
+    "detail_scan_complete": true,
+    "detail_seconds": 145
+  }
+}
