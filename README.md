@@ -9,11 +9,36 @@ Built for the [Builderr Signalpost challenge](https://builderr.ai/challenges/sig
 | | |
 |---|---|
 | Run it | `npm ci`, then `npx tsx agent/run.ts <input-file> out` (Node.js 22.12 or later). No AI model, no API keys, $0 per run. |
+| Run it without Node installed | For a harness built around Python: `uv venv && uv pip install .`, then `signalpost <input-file> out`. The install step brings Node in from PyPI, so an empty virtual environment is all that is needed. See "Running from a Python environment". |
 | Try it without installing | Live demo: [signalpost-g4p5.onrender.com](https://signalpost-g4p5.onrender.com). It runs on a free plan, so the first page after a pause can take up to a minute. |
 | Full live run, 1,000 companies | The official command on GitHub's servers, run five times while fixing what it found (latest: 3 November 2026, commit `71ce6e9`): 1,000 of 1,000 envelopes `available`, 60,261 facts each with its evidence, all quality checks passed, 360 seconds. An immediate re-run reported no false removals; its 15 changes are additions from sites that were slow on their first visit. It can be repeated from the Actions tab ("Full live run"), in this repository or in a fork. |
 | Accuracy | A hand check by a person of 52 published website items: of the 43 she could judge, 40 right (every website, social account and news post), 3 wrong (job decisions: one since fixed, one page changed after the run, one open-application list). Claude's separate cross-check of the same items: 49 right, 2 wrong (both fixed), 1 can't tell. The two checks agree on 40 of the 42 items both judged. |
 | Live QA | An outside QA agent (Momentic) tested the live demo and found 10 issues, all fixed. Its second run confirmed 9 of them; the tenth only shows when a source changes, and an offline test covers it. |
 | Offline tests | 158 checks: `npm run check:signalpost` |
+
+## Running from a Python environment
+
+The agent is TypeScript and normally runs with Node. For a reviewer whose setup has `uv` or `pip`
+but no Node, the repository also installs as a Python package: `pyproject.toml` declares
+[`nodejs-wheel-binaries`](https://pypi.org/project/nodejs-wheel-binaries/), which ships the
+official Node and npm binaries from PyPI. The agent's own code is unchanged by this.
+
+From an empty virtual environment:
+
+```bash
+uv venv && uv pip install .          # or: python -m venv .venv && .venv/bin/pip install .
+signalpost examples/sample-orgnrs.txt out
+```
+
+The run command installs the Node dependencies once (`npm ci`), then runs
+`npx tsx agent/run.ts <input-file> <out-dir>`, the same command as above, and passes every
+argument through, so the agent's own options work unchanged. Two extra commands help check the
+install without a full run: `signalpost --selftest` runs the offline checks, and
+`signalpost --where` prints the checkout and the Node version. If the package is installed from
+outside the checkout, set `SIGNALPOST_REPO` to it.
+
+Checked on a clean machine with no Node on `PATH`: the install step, all 158 offline checks, and
+a live run all pass this way.
 
 ## What's new in version 5
 

@@ -10,3 +10,7 @@ coverage/
 # Signalpost run outputs and refresh state
 out/
 .signalpost-state/
+# Python packaging artefacts from the uv/pip install path
+__pycache__/
+*.egg-info/
+.venv/
